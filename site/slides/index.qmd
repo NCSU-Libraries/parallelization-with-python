@@ -163,6 +163,22 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: A breadcrumb along the top reads core, chip, computer, cluster, with core marked, and one big red square stands for a single core, labeled: One core, a plain loop. The core opens to show a vector unit, a row of 8 slots that handle 8 numbers in one step, beside a plain loop that handles one number at a time, with the label: One core, vectorized, vectorize first. The core shrinks into a chip with 14 cores, drawn as in the first animation, and all 14 light up under a red today tag, with the label: One chip, multiprocessing, concurrent.futures, joblib. The chip shrinks into a computer, where the CPU chip sits next to a GPU drawn as a dense grid of tiny cores, with the label: One computer, a GPU splits the data across thousands of small cores, PyTorch, CuPy, Numba. The computer shrinks into one node of a cluster of rack nodes, with the label: Many computers, a cluster such as NC State's Hazel, job arrays, Dask, Ray, mpi4py. The view zooms back in to the chip, the breadcrumb marks chip with You are here under it, and the label again reads: One chip, multiprocessing, concurrent.futures, joblib.]{.visually-hidden}
 
+## Why not a GPU for everything? {#anim-cpu-gpu data-state="anim-slide" background-iframe="anim/cpu-gpu.html" background-interactive="true"}
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+[Text alternative: On the left is a CPU chip with 14 cores and on the right is a GPU drawn as a dense grid of tiny cores grouped in blocks of 32, with captions saying this laptop has 14 CPU cores and an NVIDIA T4, the GPU Colab's free tier usually gives you, has 2,560 cores. Each CPU core now shows a different small job, a forest, a file, a chart or a loop, while one group of 32 GPU cores lights up together and does the same step at the same moment, each core on different data. The group of 32 meets an if tree, else branch, so half the group runs while the other half waits in gray and then the halves swap, because cores in one group that need different branches take turns. A gray parcel is copied along a bus from computer memory into the GPU's own memory, as on most GPUs, with a note that Apple's chips share memory between the CPU and the GPU. Two cards give the verdict: a GPU wins on the same simple math on huge arrays, such as images, matrices and neural networks with CuPy, PyTorch or JAX, and a CPU wins on different, branchy work and ordinary Python, and a last line says our forest fire follows the flames with a queue, so a GPU could burn thousands of forests at once only after a rewrite as array updates, which is the price.]{.visually-hidden}
+
 ## Your decision: two questions {#decision-map data-state="anim-slide" background-iframe="anim/decision-map.html" background-interactive="true"}
 
 ::: {.fragment}
@@ -183,7 +199,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 ::: {.fragment}
 :::
 
-[Text alternative: Three column heads read: What do you split, How often do the pieces talk, and Reach for. Row one, in red: split the inputs, the pieces never talk, and you reach for multiprocessing.Pool, which is today's choice. Row two: split the data, the pieces talk once at the end, and you reach for Pool.map and then combine, or Dask DataFrame when the data is bigger than memory. Row three: split the space, the pieces talk every step, and you reach for MPI with mpi4py, or Dask's map_overlap. Row four: split the steps, the pieces talk at each handoff, and you reach for queues, Dask or workflow tools. Three side checks appear under the table: mostly waiting for the network or disk means threads or asyncio, already NumPy-shaped means vectorize first, and bigger than one machine means a cluster. The full table stays on screen with row one in red, and the caption asks: Where did your task land?]{.visually-hidden}
+[Text alternative: Three column heads read: What do you split, How often do the pieces talk, and Reach for. Row one, in red: split the inputs, the pieces never talk, and you reach for multiprocessing.Pool, which is today's choice. Row two: split the data, the pieces talk once at the end, and you reach for Pool.map and then combine, or Dask DataFrame when the data is bigger than memory. Row three: split the space, the pieces talk every step, and you reach for MPI with mpi4py, or Dask's map_overlap. Row four: split the steps, the pieces talk at each handoff, and you reach for queues, Dask or workflow tools. Three side checks appear under the table: mostly waiting for the network or disk means threads or asyncio, already NumPy-shaped means vectorize first and a GPU if it's huge, and bigger than one machine means a cluster. The full table stays on screen with row one in red, and the caption asks: Where did your task land?]{.visually-hidden}
 
 # How multiprocessing works {.divider background-color="#CC0000"}
 

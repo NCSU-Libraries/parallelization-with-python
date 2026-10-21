@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why not a GPU for everything?</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A5b: why not a GPU for everything? Two panels in every beat: a CPU on the left, a GPU on the right. The chip is drawn
+     as in A1 (cores.html) and the GPU's tiny cores as in A5 (where.html), here as 80 blocks of 32. Red is work; gray is
+     waiting and overhead (cores that wait in a branch, the parcel on the bus). Beats 1 and 2 open one block in a lens. */
+  #layer { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+
+  /* the chip, as in where.html, with a small job on each core in beat 1 */
+  .chip-base  { fill: var(--idle); }
+  .chip-plate { fill: var(--paper); stroke: var(--line); }
+  .chip-pin   { fill: var(--line); }
+  .c-dim  { fill: var(--idle); stroke: var(--overhead); }
+  .c-lit  { fill: var(--red); stroke: var(--red-deep); }
+  .ic     { fill: var(--paper); }
+  .ic-cut { fill: var(--red); }
+  .ic-s   { fill: none; stroke: var(--paper); stroke-width: 5; stroke-linecap: round; }
+
+  /* the GPU: a plate of 80 blocks, each block 32 tiny cores */
+  .gpu      { fill: var(--paper); stroke: var(--line); stroke-width: 4; }
+  .g-block  { fill: var(--idle); }
+  .g-core   { fill: var(--overhead); }
+  .hot-ring { fill: none; stroke: var(--red); stroke-width: 3; }
+  .hot-bg   { fill: var(--red); }
+  .hot-core { fill: var(--paper); }
+
+  /* the lens: one block of 32, big. A core is idle, running (red) or waiting (gray). */
+  .cone      { fill: color-mix(in srgb, var(--red) 14%, transparent); }
+  .cone-edge { fill: none; stroke: var(--red); stroke-width: 3; }
+  .lens   { fill: var(--paper); stroke: var(--red); stroke-width: 5; }
+  .l-idle { fill: var(--idle); stroke: var(--overhead); stroke-width: 3; }
+  .l-wait { fill: var(--overhead); stroke: var(--overhead); stroke-width: 3; }
+  .l-run  { fill: var(--red); stroke: var(--red-deep); stroke-width: 3; }
+  .l-dig  { font: 800 22px var(--font); fill: var(--muted); }
+
+  /* beat 3: two memories, the stubs that join them to their chips, and the bus between them */
+  .stub   { fill: none; stroke: var(--overhead); stroke-width: 14; }
+  .bus-o  { fill: none; stroke: var(--overhead); stroke-width: 24; stroke-dasharray: 1; }
+  .bus-i  { fill: none; stroke: var(--paper); stroke-width: 16; stroke-dasharray: 1; }
+
+  .hd   { position: absolute; top: 96px; width: 576px; margin: 0; text-align: center; font: 800 30px/40px var(--font); color: var(--ink); }
+  .cap  { position: absolute; top: 488px; margin: 0; text-align: center; font: 600 26px/1.22 var(--font); color: var(--ink); text-wrap: balance; opacity: 0; }
+  .cap b { font-weight: 800; }
+  .cap.l { left: 56px; width: 560px; }
+  .cap.r { left: 664px; width: 560px; }
+  .cap.wide { left: 90px; width: 1100px; top: 542px; }
+  .note { position: absolute; left: 48px; top: 620px; width: 1184px; margin: 0; text-align: center; opacity: 0; }
+  .note span { display: inline-block; height: 36px; padding: 0 22px; border-radius: 18px; background: var(--idle); font: 600 24px/36px var(--font); color: var(--muted); }
+
+  /* the branch: a dark card, like the code card in cores.html, with the line that runs lit */
+  .code { position: absolute; left: 668px; top: 340px; width: 184px; height: 84px; background: var(--ink); border-radius: 16px; opacity: 0; }
+  .code pre { position: absolute; left: 16px; top: 8px; margin: 0; font: 400 24px/34px var(--mono); white-space: pre; font-variant-ligatures: none; color: var(--paper); }
+  .code .hl { position: absolute; left: 6px; width: 172px; height: 34px; border-radius: 9px; background: color-mix(in srgb, var(--paper) 22%, transparent); opacity: 0; }
+
+  .mem  { position: absolute; top: 428px; width: 280px; height: 100px; background: var(--ink); border-radius: 16px; opacity: 0; }
+  .mem .tag { position: absolute; left: 20px; top: 4px; font: 700 24px/32px var(--font); font-style: normal; color: var(--paper); }
+  .slot   { position: absolute; top: 468px; width: 124px; height: 52px; border: 3px dashed var(--overhead); border-radius: 10px; opacity: 0; }
+  .parcel { position: absolute; top: 468px; width: 124px; height: 52px; display: flex; align-items: center; justify-content: center; opacity: 0;
+            background: var(--overhead); border: 3px solid var(--muted); border-radius: 10px; font: 700 22px/1.25 var(--mono); color: var(--ink); }
+
+  /* beat 4: the verdict */
+  .vcard { position: absolute; top: 152px; width: 576px; height: 272px; background: var(--idle); border: 4px solid var(--overhead); border-radius: 24px; opacity: 0; }
+  .vcard .mini { position: absolute; left: 20px; top: 20px; }
+  .vcard .ch { position: absolute; left: 210px; top: 20px; height: 104px; margin: 0; display: flex; align-items: center; font: 800 38px/1.1 var(--font); color: var(--ink); }
+  .vcard .cb { position: absolute; left: 24px; top: 140px; width: 520px; margin: 0; font: 600 28px/1.26 var(--font); color: var(--ink); }
+  .vcard .cb code { font: 700 26px var(--mono); }
+  .fire { position: absolute; left: 48px; top: 446px; width: 1184px; margin: 0; padding: 14px 28px; background: var(--paper); border: 5px dashed var(--overhead); border-radius: 24px;
+          font: 600 26px/1.28 var(--font); color: var(--ink); text-wrap: balance; opacity: 0; }
+  .fire b { font-weight: 800; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Why not a GPU for everything?</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <div id="layer" aria-hidden="true">
+    <p class="hd" style="left:48px">CPU: a few strong cores</p>
+    <p class="hd" style="left:656px">GPU: thousands of simple cores</p>
+
+    <p class="cap l" id="capL0">This laptop: <b>14 CPU cores</b>.</p>
+    <p class="cap r" id="capR0">An NVIDIA T4, the GPU Colab&rsquo;s free tier usually gives you: <b>2,560 cores</b>.</p>
+    <p class="cap l" id="capL1">Each CPU core can run <b>a different program</b>, with its own branches and loops.</p>
+    <p class="cap r" id="capR1">A GPU group of 32 does <b>the same step</b> at the same moment, each core on different data.</p>
+    <p class="cap r" id="capR2">When cores in one group need different branches, they <b>take turns</b>, so half the group waits.</p>
+
+    <div class="code" id="code"><i class="hl" id="hl1" style="top:8px"></i><i class="hl" id="hl2" style="top:42px"></i><pre>if tree: …
+else: …</pre></div>
+
+    <div class="mem" id="memL" style="left:196px"><i class="tag">computer memory</i></div>
+    <div class="mem" id="memR" style="left:804px"><i class="tag">GPU memory</i></div>
+    <i class="slot" id="slotL" style="left:216px"></i>
+    <i class="slot" id="slotR" style="left:824px"></i>
+    <div class="parcel" id="parA" style="left:216px">data</div>
+    <div class="parcel" id="parB" style="left:824px">data</div>
+    <p class="cap wide" id="capW3">On most GPUs, data is first <b>copied</b> into the GPU&rsquo;s own memory: the parcels again, only bigger.</p>
+    <p class="note" id="note3"><span>Apple&rsquo;s chips share memory between the CPU and the GPU.</span></p>
+
+    <div class="vcard" id="cardR" style="left:656px">
+      <svg class="mini" id="miniR" width="170" height="104" viewBox="0 0 170 104"></svg>
+      <p class="ch">GPU wins</p>
+      <p class="cb">the same simple math on huge arrays: images, matrices, neural networks (<code>CuPy</code>, <code>PyTorch</code>, <code>JAX</code>)</p>
+    </div>
+    <div class="vcard" id="cardL" style="left:48px">
+      <svg class="mini" id="miniL" width="170" height="104" viewBox="0 0 170 104"></svg>
+      <p class="ch">CPU wins</p>
+      <p class="cb">different, branchy work, and ordinary Python</p>
+    </div>
+    <p class="fire" id="fire">Our forest fire follows the flames with a queue: branchy and step by step. Rewritten as array updates, with every cell checking its neighbors each step, a GPU could burn thousands of forests at once. <b>That rewrite is the price.</b></p>
+  </div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+const INK = Anim.tok("--ink"), MUTED = Anim.tok("--muted"), PAPER = Anim.tok("--paper");
+
+// ---- the chip, in A1's look, at any width (A1's plate is 720 wide) ---------------------------------------------------------
+// 10 performance cores in two rows, 4 efficiency cores under them. Every core is a dim layer and a red layer.
+function drawChip(parent, cx, cy, w) {
+  const k = w / 720, h = 432 * k, PIN = 14 * k, x = cx - w / 2, y = cy - h / 2;
+  const sw = (k >= 0.3 ? 3 : 1.5) + "px", psw = (k >= 0.3 ? 3 : 2.5) + "px";
+  const g = svg("g", {}, parent);
+  svg("rect", { class: "chip-base", x, y: y + PIN, width: w, height: h, rx: 40 * k }, g);
+  for (let i = 0; i < 11; i++) {                               // pins along the long sides
+    const px = x + 46 * k + i * ((w - 92 * k - 31 * k) / 10);
+    svg("rect", { class: "chip-pin", x: px, y: y - PIN, width: 31 * k, height: PIN + 8 * k, rx: 6 * k }, g);
+    svg("rect", { class: "chip-pin", x: px, y: y + h - 8 * k, width: 31 * k, height: PIN + 8 * k, rx: 6 * k }, g);
+  }
+  for (let i = 0; i < 7; i++) {                                // and the short ones
+    const py = y + 46 * k + i * ((h - 92 * k - 31 * k) / 6);
+    svg("rect", { class: "chip-pin", x: x - PIN, y: py, width: PIN + 8 * k, height: 31 * k, rx: 6 * k }, g);
+    svg("rect", { class: "chip-pin", x: x + w - 8 * k, y: py, width: PIN + 8 * k, height: 31 * k, rx: 6 * k }, g);
+  }
+  svg("rect", { class: "chip-plate", x, y, width: w, height: h, rx: 38 * k, style: { strokeWidth: psw } }, g);
+  svg("circle", { class: "chip-pin", cx: x + 26 * k, cy: y + 26 * k, r: 8 * k }, g);
+  const PC = 110 * k, EC = 72 * k, GAP = 17 * k;
+  const px0 = x + (w - (5 * PC + 4 * GAP)) / 2, py0 = y + 46 * k;
+  const eX0 = x + (w - (4 * EC + 3 * GAP)) / 2, eY = py0 + 2 * PC + GAP + 30 * k;
+  const cores = [];
+  const core = (x0, y0, s, r) => {
+    const at = { x: x0, y: y0, width: s, height: s, rx: r, style: { strokeWidth: sw } };
+    svg("rect", Object.assign({ class: "c-dim" }, at), g);
+    const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), g);
+    lit.style.opacity = 0;
+    cores.push({ lit, x: x0 + s / 2, y: y0 + s / 2, s });
+  };
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) core(px0 + c * (PC + GAP), py0 + r * (PC + GAP), PC, 24 * k);
+  for (let c = 0; c < 4; c++) core(eX0 + c * (EC + GAP), eY, EC, 17 * k);
+  return { g, cores };
+}
+
+// ---- geometry (stage pixels) -----------------------------------------------------------------------------------------------
+const TOP = 156;                                               // the chip's plate and the GPU's plate start here
+const CHIP = { cx: 336, w: 400 };                              // the left panel's middle; the plate is 240 tall
+const DIE = { x: 685, y: TOP, w: 519, h: 243 };                // the GPU's plate, in the right panel
+const BW = 45, BH = 23, PX = 50, PY = 28;                      // one block of 32 cores, and the pitch between blocks
+const GX = DIE.x + 12, GY = DIE.y + 12;                        // where the first block starts: 10 across, 8 down = 80 blocks
+
+// ---- the GPU: one tile of 32 cores (8 x 4), repeated into 80 blocks -------------------------------------------------------
+const defs = svg("defs", {}, art);
+const tile = svg("pattern", { id: "blocks", x: GX, y: GY, width: PX, height: PY, patternUnits: "userSpaceOnUse" }, defs);
+svg("rect", { class: "g-block", x: 0, y: 0, width: BW, height: BH, rx: 4 }, tile);
+const coreAt = (i, j) => ({ x: 3.2 + i * 5, y: 2.6 + j * 4.7, width: 3.6, height: 3.6, rx: 0.8 });
+for (let j = 0; j < 4; j++) for (let i = 0; i < 8; i++) svg("rect", Object.assign({ class: "g-core" }, coreAt(i, j)), tile);
+
+const gGpu = svg("g", {}, art);
+const dieArt = svg("g", { id: "dieArt" }, gGpu);               // the plate and its blocks (the cards in beat 4 draw it small)
+svg("rect", { class: "gpu", x: DIE.x, y: DIE.y, width: DIE.w, height: DIE.h, rx: 22 }, dieArt);
+svg("rect", { x: GX, y: GY, width: 9 * PX + BW, height: 7 * PY + BH, fill: "url(#blocks)" }, dieArt);
+
+const HB = { x: GX + 7 * PX, y: GY + PY };                     // the block that lights up in beat 1
+const gHot = svg("g", {}, gGpu);
+svg("rect", { class: "hot-ring", x: HB.x - 4, y: HB.y - 4, width: BW + 8, height: BH + 8, rx: 8 }, gHot);
+svg("rect", { class: "hot-bg", x: HB.x, y: HB.y, width: BW, height: BH, rx: 4 }, gHot);
+for (let j = 0; j < 4; j++) for (let i = 0; i < 8; i++) {
+  const c = coreAt(i, j);
+  svg("rect", { class: "hot-core", x: HB.x + c.x, y: HB.y + c.y, width: c.width, height: c.height, rx: c.rx }, gHot);
+}
+
+// ---- the CPU: 14 cores, each with its own small job in beat 1 --------------------------------------------------------------
+const gCpu = svg("g", {}, art);
+const chip = drawChip(gCpu, CHIP.cx, TOP + 120, CHIP.w);
+
+// four jobs in a 40 x 40 box around (0, 0): a forest, a file, a chart, a loop. White on a red core.
+const PINE = "M0,-18 L9,-4 H4 L12,8 H-12 L-4,-4 H-9 Z M-2.5,8 H2.5 V15 H-2.5 Z";
+const JOBS = [
+  g => {                                                       // a forest
+    svg("path", { class: "ic", d: PINE, transform: "translate(-9 4) scale(0.72)" }, g);
+    svg("path", { class: "ic", d: PINE, transform: "translate(8 0) scale(0.95)" }, g);
+  },
+  g => {                                                       // a file: a page with a folded corner and three lines
+    svg("path", { class: "ic", d: "M-12,-17 H3 L12,-8 V17 H-12 Z" }, g);
+    svg("path", { class: "ic-cut", d: "M3,-17 V-8 H12 Z" }, g);
+    [-3, 4, 11].forEach(y => svg("rect", { class: "ic-cut", x: -7, y, width: 14, height: 3.5, rx: 1 }, g));
+  },
+  g => {                                                       // a chart: three bars on a baseline
+    [[-16, 3, 9, 15], [-4.5, -6, 9, 24], [7, -16, 9, 34]].forEach(([x, y, w, h]) => svg("rect", { class: "ic", x, y, width: w, height: h, rx: 1.5 }, g));
+    svg("rect", { class: "ic", x: -18, y: 19.5, width: 36, height: 4, rx: 2 }, g);
+  },
+  g => {                                                       // a loop: an arrow that goes round
+    const R = 12, a0 = -50 * Math.PI / 180, a1 = a0 + 270 * Math.PI / 180;
+    const p0 = [R * Math.cos(a0), R * Math.sin(a0)], p1 = [R * Math.cos(a1), R * Math.sin(a1)];
+    const dir = [-Math.sin(a1), Math.cos(a1)], out = [Math.cos(a1), Math.sin(a1)];
+    svg("path", { class: "ic-s", d: `M${p0} A${R},${R} 0 1 1 ${p1}` }, g);
+    const tip = [p1[0] + 9 * dir[0], p1[1] + 9 * dir[1]];
+    const b1 = [p1[0] + 7 * out[0], p1[1] + 7 * out[1]], b2 = [p1[0] - 7 * out[0], p1[1] - 7 * out[1]];
+    svg("polygon", { class: "ic", points: `${tip} ${b1} ${b2}` }, g);
+  },
+];
+const KIND = [0, 1, 2, 3, 0, 2, 3, 0, 1, 2, 1, 2, 3, 0];       // neighbors never share a job
+const icons = chip.cores.map((c, i) => {
+  const at = svg("g", { transform: `translate(${c.x} ${c.y}) scale(${c.s * 0.0155})` }, gCpu);   // placed here, popped by the inner group
+  const g = svg("g", { class: "fb" }, at);
+  JOBS[KIND[i]](g);
+  g.style.opacity = 0;
+  return g;
+});
+
+// ---- the lens: one block of 32, 8 across and 4 down, each core on its own number ----------------------------------------
+const LENS = { x: 872, y: 282, w: 348, h: 188, pad: 16, cell: 36, pitch: 40 };
+const gLens = svg("g", {}, art);
+gLens.style.transformOrigin = `${HB.x + BW / 2}px ${HB.y + BH / 2}px`;   // it opens out of the lit block
+const cy0 = HB.y + BH + 4;
+svg("polygon", { class: "cone", points: `${HB.x - 4},${cy0} ${HB.x + BW + 4},${cy0} ${LENS.x + LENS.w},${LENS.y} ${LENS.x},${LENS.y}` }, gLens);
+svg("path", { class: "cone-edge", d: `M${HB.x - 4},${cy0} L${LENS.x},${LENS.y} M${HB.x + BW + 4},${cy0} L${LENS.x + LENS.w},${LENS.y}` }, gLens);
+svg("rect", { class: "lens", x: LENS.x, y: LENS.y, width: LENS.w, height: LENS.h, rx: 22 }, gLens);
+const DIGITS = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3, 8, 3, 2, 7, 9, 5];
+const lcores = DIGITS.map((d, k) => {
+  const i = k % 8, j = Math.floor(k / 8), x = LENS.x + LENS.pad + i * LENS.pitch, y = LENS.y + LENS.pad + j * LENS.pitch;
+  const at = { x, y, width: LENS.cell, height: LENS.cell, rx: 8 };
+  svg("rect", Object.assign({ class: "l-idle" }, at), gLens);
+  const wait = svg("rect", Object.assign({ class: "l-wait" }, at), gLens);
+  const run = svg("rect", Object.assign({ class: "l-run" }, at), gLens);
+  const txt = svg("text", { class: "l-dig", x: x + LENS.cell / 2, y: y + 26, "text-anchor": "middle", text: d }, gLens);
+  return { i, wait, run, txt };
+});
+const FILL = [MUTED, PAPER, INK];                              // the number's color: idle, running, waiting
+const coreState = (c, s) => {                                  // 0 idle, 1 running, 2 waiting
+  c.run.style.opacity = s === 1 ? 1 : 0;
+  c.wait.style.opacity = s === 2 ? 1 : 0;
+  c.txt.style.fill = FILL[s];
+};
+
+// ---- beat 3: two memories, joined to their chips and to each other by a bus ---------------------------------------------------
+const gMem = svg("g", {}, art);
+svg("path", { class: "stub", d: `M${CHIP.cx},404 V428` }, gMem);
+svg("path", { class: "stub", d: `M${DIE.x + DIE.w / 2},${DIE.y + DIE.h} V428` }, gMem);
+const BUS = "M476,494 H804";
+const busO = svg("path", { class: "bus-o", d: BUS, pathLength: 1 }, gMem), busI = svg("path", { class: "bus-i", d: BUS, pathLength: 1 }, gMem);
+const DX = 824 - 216;                                          // the parcel's trip: from one slot to the other
+
+// ---- beat 4: the cards carry a small picture of each chip -------------------------------------------------------------------------
+const mini = drawChip($("miniL"), 85, 52, 150);
+mini.cores.forEach(c => { c.lit.style.opacity = 1; });
+const K = 0.3;
+svg("use", { href: "#dieArt", transform: `translate(${85 - K * (DIE.x + DIE.w / 2)} ${52 - K * (DIE.y + DIE.h / 2)}) scale(${K})` }, $("miniR"));
+
+// ---- what is on screen at each beat --------------------------------------------------------------------------------------------
+const E = Object.fromEntries("code memL memR slotL slotR parA parB capL0 capR0 capL1 capR1 capR2 capW3 note3 cardL cardR fire hl1 hl2".split(" ").map(id => [id, $(id)]));
+const SHOW = [
+  [gCpu, gGpu, E.capL0, E.capR0],
+  [gCpu, gGpu, gHot, gLens, E.capL1, E.capR1],
+  [gCpu, gGpu, gHot, gLens, E.code, E.capL1, E.capR2],
+  [gCpu, gGpu, gMem, E.memL, E.memR, E.slotL, E.slotR, E.parA, E.parB, E.capW3, E.note3],
+  [E.cardL, E.cardR, E.fire],
+];
+const ALL = [...new Set(SHOW.flat())];
+
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0px)" }];
+const pop = [{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1)" }];
+const popLit = [{ opacity: 0, transform: "scale(0.84)" }, { opacity: 1, transform: "scale(1)" }];
+// keyframes that move one property through (ms, value) points, for a duration of the last ms: use with easing "linear"
+const through = (prop, pts) => { const T = pts[pts.length - 1][0]; return { kf: pts.map(([t, v]) => ({ [prop]: v, offset: t / T })), T }; };
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "On the left is a CPU chip with 14 cores and on the right is a GPU drawn as a dense grid of tiny cores grouped in blocks of 32, with captions saying this laptop has 14 CPU cores and an NVIDIA T4, the GPU Colab's free tier usually gives you, has 2,560 cores.",
+    "Each CPU core now shows a different small job, a forest, a file, a chart or a loop, while one group of 32 GPU cores lights up together and does the same step at the same moment, each core on different data.",
+    "The group of 32 meets an if tree, else branch, so half the group runs while the other half waits in gray and then the halves swap, because cores in one group that need different branches take turns.",
+    "A gray parcel is copied along a bus from computer memory into the GPU's own memory, as on most GPUs, with a note that Apple's chips share memory between the CPU and the GPU.",
+    "Two cards give the verdict: a GPU wins on the same simple math on huge arrays, such as images, matrices and neural networks with CuPy, PyTorch or JAX, and a CPU wins on different, branchy work and ordinary Python, and a last line says our forest fire follows the flames with a queue, so a GPU could burn thousands of forests at once only after a rewrite as array updates, which is the price.",
+  ],
+
+  render(n) {
+    for (const el of ALL) { el.style.opacity = SHOW[n].includes(el) ? 1 : 0; el.style.transform = ""; }
+    const busy = n === 1 || n === 2;                           // the chip's jobs, the lit block and the lens
+    chip.cores.forEach(c => { c.lit.style.opacity = busy ? 1 : 0; c.lit.style.transform = ""; });
+    icons.forEach(g => { g.style.opacity = busy ? 1 : 0; g.style.transform = ""; });
+    lcores.forEach(c => coreState(c, n === 1 ? 1 : n === 2 ? (c.i < 4 ? 2 : 1) : 0));   // in beat 2 the left half has waited its turn
+    E.hl1.style.opacity = 0;
+    E.hl2.style.opacity = n === 2 ? 1 : 0;
+  },
+
+  enter(n, { animate }) {
+    const swapCap = (from, to, delay) => { animate(from, fade(1, 0), { duration: 400 }); animate(to, rise, { duration: 500, delay }); };
+
+    if (n === 1) {                                             // each CPU core takes a job; one block of 32 lights up and opens
+      chip.cores.forEach((c, i) => animate(c.lit, popLit, { duration: 400, delay: i * 70, easing: EASE.pop }));
+      icons.forEach((g, i) => animate(g, pop, { duration: 400, delay: 450 + i * 70, easing: EASE.pop }));
+      swapCap(E.capL0, E.capL1, 600);
+      animate(gHot, fade(0, 1), { duration: 400, delay: 1300 });
+      animate(gLens, [{ opacity: 0, transform: "scale(0.13)" }, { opacity: 1, transform: "scale(1)" }], { duration: 800, delay: 1900, easing: EASE.out });
+      lcores.forEach(c => {                                    // all 32 light up at the same moment
+        animate(c.run, fade(0, 1), { duration: 450, delay: 3000 });
+        animate(c.txt, [{ fill: MUTED }, { fill: PAPER }], { duration: 450, delay: 3000 });
+      });
+      swapCap(E.capR0, E.capR1, 2900);
+    }
+
+    if (n === 2) {                                             // the branch: half runs while half waits, then they swap
+      animate(E.code, rise, { duration: 500 });
+      swapCap(E.capR1, E.capR2, 600);
+      const run = (el, pts) => { const t = through("opacity", pts); animate(el, t.kf, { duration: t.T, easing: "linear" }); };
+      const col = (el, pts) => { const t = through("fill", pts); animate(el, t.kf, { duration: t.T, easing: "linear" }); };
+      lcores.forEach(c => {
+        if (c.i >= 4) {                                        // the else half waits first, then runs
+          run(c.run, [[0, 1], [700, 1], [1200, 0], [2300, 0], [2800, 1]]);
+          run(c.wait, [[0, 0], [700, 0], [1200, 1], [2300, 1], [2800, 0]]);
+          col(c.txt, [[0, PAPER], [700, PAPER], [1200, INK], [2300, INK], [2800, PAPER]]);
+        } else {                                               // the if half runs first, then waits
+          run(c.run, [[0, 1], [2300, 1], [2800, 0]]);
+          run(c.wait, [[0, 0], [2300, 0], [2800, 1]]);
+          col(c.txt, [[0, PAPER], [2300, PAPER], [2800, INK]]);
+        }
+      });
+      run(E.hl1, [[0, 0], [700, 0], [1000, 1], [2300, 1], [2600, 0]]);
+      run(E.hl2, [[0, 0], [2300, 0], [2600, 1]]);
+    }
+
+    if (n === 3) {                                             // the pictures calm down; a parcel is copied along a bus into the GPU's memory
+      animate(gLens, fade(1, 0), { duration: 450 });
+      animate(gHot, fade(1, 0), { duration: 450 });
+      animate(E.code, fade(1, 0), { duration: 400 });
+      chip.cores.forEach(c => animate(c.lit, fade(1, 0), { duration: 450 }));
+      icons.forEach(g => animate(g, fade(1, 0), { duration: 450 }));
+      animate(E.capL1, fade(1, 0), { duration: 400 });
+      animate(E.capR2, fade(1, 0), { duration: 400 });
+      animate(gMem, fade(0, 1), { duration: 500, delay: 500 });
+      [E.memL, E.memR].forEach(el => animate(el, rise, { duration: 500, delay: 500 }));
+      [E.slotL, E.slotR].forEach(el => animate(el, fade(0, 1), { duration: 400, delay: 800 }));
+      [busO, busI].forEach(el => animate(el, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 700, delay: 800, easing: EASE.inOut }));
+      animate(E.parA, pop, { duration: 400, delay: 1100, easing: EASE.pop });
+      animate(E.capW3, rise, { duration: 500, delay: 700 });
+      animate(E.parB, [                                        // the copy leaves the original, crosses the bus and lands in the GPU's memory
+        { opacity: 0, transform: `translateX(${-DX}px)`, offset: 0 },
+        { opacity: 1, transform: `translateX(${-DX}px)`, offset: 0.12, easing: EASE.inOut },
+        { opacity: 1, transform: "translateX(0px)", offset: 1 },
+      ], { duration: 1500, delay: 1700, easing: "linear" });
+      animate(E.note3, rise, { duration: 500, delay: 1900 });
+    }
+
+    if (n === 4) {                                             // the verdict
+      [gCpu, gGpu, gMem, E.memL, E.memR, E.slotL, E.slotR, E.parA, E.parB, E.capW3, E.note3].forEach(el => animate(el, fade(1, 0), { duration: 500 }));
+      animate(E.cardR, rise, { duration: 600, delay: 500 });
+      animate(E.cardL, rise, { duration: 600, delay: 1000 });
+      animate(E.fire, rise, { duration: 600, delay: 1900 });
+    }
+  },
+});
+</script>
+</body>
+</html>

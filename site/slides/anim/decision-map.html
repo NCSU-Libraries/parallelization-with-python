@@ -108,7 +108,7 @@ const rows = ROWS.map((r, i) => {
 
 const checks = [
   ["Mostly waiting for the network or disk?", "→ threads or asyncio"],
-  ["Already NumPy-shaped?", "→ vectorize first"],
+  ["Already NumPy-shaped?", "→ vectorize first; a GPU if it’s huge"],
   ["Bigger than one machine?", "→ a cluster"],
 ].map(([q, a], i) => box("check", X0 + i * (CHECK.w + CHECK.gap), CHECK.y, CHECK.w, CHECK.h, `<span>${q}</span><b>${a}</b>`));
 
@@ -133,7 +133,7 @@ defineAnimation({
     "Row two: split the data, the pieces talk once at the end, and you reach for Pool.map and then combine, or Dask DataFrame when the data is bigger than memory.",
     "Row three: split the space, the pieces talk every step, and you reach for MPI with mpi4py, or Dask's map_overlap.",
     "Row four: split the steps, the pieces talk at each handoff, and you reach for queues, Dask or workflow tools.",
-    "Three side checks appear under the table: mostly waiting for the network or disk means threads or asyncio, already NumPy-shaped means vectorize first, and bigger than one machine means a cluster.",
+    "Three side checks appear under the table: mostly waiting for the network or disk means threads or asyncio, already NumPy-shaped means vectorize first and a GPU if it's huge, and bigger than one machine means a cluster.",
     "The full table stays on screen with row one in red, and the caption asks: Where did your task land?",
   ],
 

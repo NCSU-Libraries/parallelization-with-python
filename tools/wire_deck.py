@@ -33,6 +33,7 @@ SLIDES = {
     "anim-talk": "talk.html",
     "anim-waiting": "waiting.html",
     "anim-where": "where.html",
+    "anim-cpu-gpu": "cpu-gpu.html",
     "decision-map": "decision-map.html",
     "anim-processes": "processes.html",
     "anim-pool-map": "pool-map.html",
