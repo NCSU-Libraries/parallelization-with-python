@@ -57,6 +57,12 @@ def burn(density, seed, size=DEFAULT_SIZE):
     return burned / trees
 
 
+def run(task):
+    """Burn one forest for a (density, seed) pair: the one-argument form Pool.map needs."""
+    density, seed = task
+    return burn(density, seed)
+
+
 def burn_steps(density, seed, size):
     """Return a flat, row-major list with one int per cell.
 

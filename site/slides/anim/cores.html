@@ -46,11 +46,18 @@
   .meter-text { position: absolute; left: 464px; top: 594px; width: 720px; margin: 0; font: 700 32px/1.15 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; }
   .meter-text b { color: var(--red); font-weight: 800; }
 
-  .colab { position: absolute; left: 882px; top: 176px; width: 300px; height: 340px; padding: 26px 24px 0; background: var(--paper); border: 4px solid var(--line); border-radius: 26px; opacity: 0; }
-  .co-name  { font: 800 32px/1.2 var(--font); color: var(--ink); margin: 0; text-align: center; }
-  .colab svg { display: block; width: 236px; height: 142px; margin: 16px auto 0; overflow: visible; }
-  .co-count { margin: 14px 0 0; font: 700 38px/1 var(--font); color: var(--ink); text-align: center; }
-  .co-count b { font-size: 76px; font-weight: 800; color: var(--red); margin-right: 10px; }
+  /* the "Yours?" card of beat 4: the code that answers it, and three rows to compare. It stands where the chip's
+     right edge ends after the chip moves left: the pair (chip 748 px + 36 px + this 340 px) is centered. */
+  .yours { position: absolute; left: 862px; top: 130px; width: 340px; padding: 22px 26px 20px; background: var(--paper); border: 4px solid var(--line); border-radius: 26px; opacity: 0; }
+  .yo-name { margin: 0; font: 800 36px/1.2 var(--font); color: var(--ink); text-align: center; }
+  .yo-code { margin: 14px 0 0; padding: 10px 18px; background: var(--ink); border-radius: 16px; font: 400 22px/1.7 var(--mono); color: var(--paper); white-space: pre; font-variant-ligatures: none; }
+  .yo-code .kw { color: var(--red-soft); }
+  .yo-rows { list-style: none; margin: 14px 0 0; padding: 0; }
+  .yo-rows li { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px; padding: 6px 14px 6px; border: 4px solid transparent; border-radius: 16px; background: var(--idle); }
+  .yo-rows li:last-child { margin-bottom: 0; background: var(--paper); border: 4px dashed var(--red); }
+  .yo-rows span { font: 700 28px/1.2 var(--font); color: var(--ink); }
+  .yo-rows b { font: 800 44px/1.1 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .yo-rows li:last-child b { color: var(--red); }
 </style>
 </head>
 <body>
@@ -71,10 +78,15 @@
     <p class="meter-text" id="meterText" aria-hidden="true"></p>
   </div>
 
-  <div class="colab" id="colab" aria-hidden="true">
-    <p class="co-name">Google Colab</p>
-    <svg viewBox="0 0 200 120" id="miniChip"></svg>
-    <p class="co-count"><b>2</b>cores</p>
+  <div class="yours" id="yours" aria-hidden="true">
+    <p class="yo-name">Yours?</p>
+    <pre class="yo-code"><span class="kw">import</span> os
+os.cpu_count()</pre>
+    <ul class="yo-rows">
+      <li><span>this laptop</span><b>14</b></li>
+      <li><span>Google Colab</span><b>2</b></li>
+      <li><span>yours</span><b>?</b></li>
+    </ul>
   </div>
 </main>
 
@@ -98,7 +110,7 @@ METER.cw = (METER.w - (METER.n - 1) * METER.gap) / METER.n;
 // where the scene stands at each beat: re-centered under the title as things appear and leave
 const SCENE = {
   0: `translate(${640 - (PLATE.x + PLATE.w / 2)}px, ${156 - Y0}px)`,          // the chip alone, centered
-  4: `translate(${(1280 - (PLATE.w + 2 * PIN + 36 + 300)) / 2 - (PLATE.x - PIN)}px, 0px)`,   // the chip moves left for the Colab card (36 px gap, 300 px card)
+  4: `translate(${(1280 - (PLATE.w + 2 * PIN + 36 + 340)) / 2 - (PLATE.x - PIN)}px, 0px)`,   // the chip moves left for the "Yours?" card (36 px gap, 340 px card)
 };
 
 // A dash pattern that closes evenly around a rounded rect, so the outline has no odd short dash.
@@ -174,24 +186,10 @@ function bez(t) {
 }
 const PATH = Array.from({ length: 13 }, (_, i) => bez(i / 12));
 
-// ---- the Colab card: its own little 2-core chip ------------------------------------------------------------------------
-const mini = document.getElementById("miniChip");
-svg("rect", { class: "chip-base", x: 10, y: 20, width: 180, height: 95, rx: 24 }, mini);
-for (let i = 0; i < 4; i++) {
-  svg("rect", { class: "chip-pin", x: 33 + i * 42, y: 2, width: 20, height: 20, rx: 5 }, mini);
-  svg("rect", { class: "chip-pin", x: 33 + i * 42, y: 104, width: 20, height: 16, rx: 5 }, mini);
-}
-svg("rect", { class: "chip-plate", x: 10, y: 10, width: 180, height: 95, rx: 24 }, mini);
-const miniCores = [34, 111].map(x => {
-  const at = { x, y: 30, width: 55, height: 55, rx: 14 };
-  svg("rect", Object.assign({ class: "c-dim" }, at), mini);
-  const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), mini);
-  return { lit };
-});
-
 // ---- state helpers ----------------------------------------------------------------------------------------------------
 const $ = id => document.getElementById(id);
-const scene = $("scene"), code = $("code"), meterText = $("meterText"), callout = $("callout"), caption = $("caption"), colab = $("colab");
+const scene = $("scene"), code = $("code"), meterText = $("meterText"), callout = $("callout"), caption = $("caption"), yours = $("yours");
+const yoRows = [...yours.querySelectorAll(".yo-rows li")];
 const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
 const pct = k => Math.round(100 * k / 14);
 function meterHTML(k) {
@@ -209,7 +207,7 @@ defineAnimation({
     "A loop, for forest in forests: burn(forest), starts running. Exactly one core lights up. The meter reads 1 of 14 cores busy, 7%.",
     "The other 13 cores are idle, shown with dashed outlines, and a callout says 13 cores waiting.",
     "All 14 cores light up. The meter reads 14 of 14 busy, 100%. The caption says: This workshop: how to use the rest.",
-    "The code card leaves and the chip moves left. A second, smaller card appears: Google Colab, 2 cores, with its own little 2-core chip.",
+    "The code card leaves, the chip moves left, and a card titled Yours? appears with the code import os and os.cpu_count() and three rows: this laptop 14, Google Colab 2, and yours with a question mark.",
   ],
 
   render(n) {
@@ -230,8 +228,8 @@ defineAnimation({
     meterText.innerHTML = meterHTML(lit);
     op(callout, n === 2 ? 1 : 0);
     op(caption, n === 3 ? 1 : 0);
-    op(colab, n >= 4 ? 1 : 0);
-    miniCores.forEach(c => op(c.lit, n >= 4 ? 1 : 0));
+    op(yours, n >= 4 ? 1 : 0);
+    yoRows.forEach(r => op(r, 1));
     op(dot, 0);
   },
 
@@ -280,12 +278,13 @@ defineAnimation({
     }
 
     if (n === 4) {
-      // the loop's work is done: the left column leaves with the scene, the chip moves left, a second machine comes in
+      // the loop's work is done: the left column leaves with the scene, the chip moves left, and the "Yours?" card comes in;
+      // its rows follow one by one, so the question lands last
       animate(scene, [{ transform: "translate(0px, 0px)" }, { transform: SCENE[4] }], { duration: 900, easing: EASE.inOut });
       animate(code, fade(1, 0), { duration: 500 });
       animate(caption, fade(1, 0), { duration: 500 });
-      animate(colab, [{ opacity: 0, transform: "translateX(70px)" }, { opacity: 1, transform: "translateX(0)" }], { duration: 750, delay: 450 });
-      miniCores.forEach((c, i) => animate(c.lit, pop(0.84), { duration: 400, delay: 1250 + i * 200, easing: EASE.pop }));
+      animate(yours, [{ opacity: 0, transform: "translateX(70px)" }, { opacity: 1, transform: "translateX(0)" }], { duration: 750, delay: 450 });
+      yoRows.forEach((r, i) => animate(r, rise(10), { duration: 450, delay: 1300 + i * 450 }));
     }
   },
 });
