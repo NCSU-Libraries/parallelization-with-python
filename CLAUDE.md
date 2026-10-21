@@ -52,6 +52,8 @@ Paths marked *(planned)* don't exist yet.
 | `tools/record_runs.py` | Runs the sweep on this machine: scaling timings, per-task traces, and burn steps for the animations |
 | `tools/check_links.py` | Checks every link and image in `site/_site` (`--web` also requests external URLs) |
 | `tools/shoot.mjs` | Headless Chrome screenshots of pages and slides |
+| `tools/wire_deck.py` | Rewrites each animation slide in the deck from its page: the title, one fragment per beat, the text alternative and `data-state`. `--check` steps every slide of the rendered deck |
+| `tools/check_overlaps.py` | Steps every slide and fragment at three window sizes. Reports content under the footer, logo, slide number or menu button; text over text; and anything off the slide |
 | `notebooks/` *(planned)* | Learner and filled Colab notebooks |
 | `instructor/` | Private and gitignored: the run of show, storyboard and polls |
 
@@ -63,6 +65,9 @@ $Q render site                          # full build into site/_site
 $Q preview site                         # live preview while editing
 $Q render site/slides/index.qmd         # the deck only
 python3 tools/check_links.py            # after a render
+uv run --with playwright python -I tools/wire_deck.py          # after adding or changing an animation; then render
+uv run --with playwright python -I tools/wire_deck.py --check  # after a render: every animation follows the clicks
+uv run --with playwright python -I tools/check_overlaps.py     # after a render: nothing under the chrome, over other text, or off the slide
 
 # Re-record timings, traces and burn steps. Python 3.13 matches Colab. Run it on a quiet machine: close Zoom and
 # don't render while it runs.
@@ -118,7 +123,7 @@ It uses no external JavaScript libraries: SVG, CSS and the Web Animations API on
 Embedding, in the deck:
 
 ```markdown
-## Fourteen cores {#anim-cores background-iframe="anim/cores.html" background-interactive="true"}
+## This laptop: 14 cores {#anim-cores data-state="anim-slide" background-iframe="anim/cores.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -128,6 +133,8 @@ Embedding, in the deck:
 
 [Text alternative: what the animation shows, beat by beat.]{.visually-hidden}
 ```
+
+`tools/wire_deck.py` writes these slides from the pages. Don't edit them by hand.
 
 ## Keeping things consistent
 
@@ -149,6 +156,11 @@ Embedding, in the deck:
   root commit doesn't trigger the paths-filtered workflow, so run it once from the Actions tab.
 - **Quarto smartens `{{< var >}}` values**, even inside code blocks: a bare `--` becomes an en dash. Escape hyphens in
   `_variables.yml`. The deck sets `from: markdown-smart` so quotes in code stay straight.
+- **Keep the deck's footer short, about 50 characters.** A longer one runs under the logo in a laptop-sized window.
+  The go link goes in it once it exists.
+- **Animation slides carry `data-state="anim-slide"`.** It hides the footer and logo, which would sit on the
+  animations' bottom captions. The rule is in `site/theme/slides.scss`, next to the DSS slides' rule, and is this
+  repo's one change to the theme copied from dsti-python.
 - **Every `#` section slide needs `{.divider}`.** Quarto gives level-1 slides the class `title-slide`, and `ncsu.scss`
   paints that white.
 - **Testing animations:**

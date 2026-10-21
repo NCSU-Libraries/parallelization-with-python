@@ -13,7 +13,7 @@ format:
     transition: fade
     background-transition: fade
     preview-links: false
-    footer: "Data Science Services · ncsu-libraries.github.io/parallelization-with-python"
+    footer: "Data Science Services · Parallelization with Python"
     logo: ../images/lib_logo_whiteBG.png
     include-after-body:
       text: |
@@ -59,7 +59,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # Welcome and the main idea {.divider background-color="#CC0000"}
 
-## This laptop: 14 cores {#anim-cores background-iframe="anim/cores.html" background-interactive="true"}
+## This laptop: 14 cores {#anim-cores data-state="anim-slide" background-iframe="anim/cores.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -77,7 +77,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # The landscape {.divider background-color="#CC0000"}
 
-## Reading the lanes {#anim-lanes-primer background-iframe="anim/lanes-primer.html" background-interactive="true"}
+## Reading the lanes {#anim-lanes-primer data-state="anim-slide" background-iframe="anim/lanes-primer.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -90,7 +90,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: Twelve identical red task blocks wait in a queue at the left. To their right is one empty lane, worker 1, with a time axis. The legend along the bottom reads: lane equals worker, block equals task, gray equals overhead, line equals finish. The twelve tasks slide into worker 1's lane one after another. The finish line drops at 12 units: 1 worker, 12 units. Three more lanes appear and the tasks are dealt out round-robin to four workers. A new finish line lands at 3 units: 4 workers, 3 units, 4 times faster. The old 12-unit line stays as a faint ghost. A gray overhead sliver now comes before every task, and the finish line slides right to about 3.6 units: 3.4 times faster, not 4. Handing out work isn't free.]{.visually-hidden}
 
-## Three kinds of parallel work {#anim-kinds background-iframe="anim/kinds.html" background-interactive="true"}
+## Three kinds of parallel work {#anim-kinds data-state="anim-slide" background-iframe="anim/kinds.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -106,7 +106,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: Three empty panels sit side by side, titled Independent pieces, Pieces that must talk and A pipeline, each with three empty lanes. In the first panel each of the three lanes fills with its own blocks, with no arrows between lanes, and all three finish together; the caption says each piece stands alone, like many files, many simulations or many settings, and a red tag says today. In the second panel the lanes work in rounds, each with a short block, gray idle time up to a dashed barrier and arrows between neighboring lanes, before the next round starts; the caption says neighbors trade results every step, like a weather model's grid, using MPI. In the third panel the lanes become the stages load, clean and analyze, and items 1 to 4 move through diagonally, so item 1 is cleaned while item 2 loads; the caption compares it to an assembly line. Panels 2 and 3 dim to 35% and panel 1 gets a red outline, with the caption: Today: independent pieces, the most common case and the easiest to speed up.]{.visually-hidden}
 
-## Waiting vs. computing {#anim-waiting background-iframe="anim/waiting.html" background-interactive="true"}
+## Waiting vs. computing {#anim-waiting data-state="anim-slide" background-iframe="anim/waiting.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -122,7 +122,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: Two rows each run on one worker, one task after another: downloading 4 files, where each short red block is followed by a long hatched gray wait for the network or the disk, and burning 4 forests, where each task is solid red. In the downloading row one worker juggles all four files, so their waits overlap on the same lane, staggered, and the finish line jumps left; the label says threads and asyncio can do this, but not today. In the burning row four threads get four lanes, but a single round token labeled GIL hops between them, only the lane holding it is red at any moment, and the finish line does not move; the label says threads take turns running Python code, one at a time. The burning row switches to four processes: each lane gets its own token, all four compute at once, and the finish line moves to a quarter of its old distance; the label says separate processes each run their own Python, which is multiprocessing. A muted footnote says Python 3.13 and later offer an optional build without the GIL, but standard installs and Colab still have it.]{.visually-hidden}
 
-## Where parallelism lives {#anim-where background-iframe="anim/where.html" background-interactive="true"}
+## Where parallelism lives {#anim-where data-state="anim-slide" background-iframe="anim/where.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -138,7 +138,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: A breadcrumb along the top reads core, chip, computer, cluster, with core marked, and one big red square stands for a single core, labeled: One core, a plain loop. The core shrinks into a chip with 14 cores, drawn as in the first animation, and all 14 light up under a red today tag, with the label: One chip, multiprocessing, concurrent.futures, joblib. The chip shrinks into a computer, where the CPU chip sits next to a GPU drawn as a dense grid of tiny cores, with the label: One computer, a GPU adds thousands of small cores, PyTorch, CuPy, Numba. The computer shrinks into one node of a cluster of rack nodes, with the label: Many computers, a cluster such as NC State's Hazel, job arrays, Dask, Ray, mpi4py. The view zooms back in to the chip, the breadcrumb marks chip with You are here under it, and the label again reads: One chip, multiprocessing, concurrent.futures, joblib.]{.visually-hidden}
 
-## Where does your task fit? {#decision-map background-iframe="anim/decision-map.html" background-interactive="true"}
+## Where does your task fit? {#decision-map data-state="anim-slide" background-iframe="anim/decision-map.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -159,7 +159,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # How multiprocessing works {.divider background-color="#CC0000"}
 
-## Inside multiprocessing {#anim-processes background-iframe="anim/processes.html" background-interactive="true"}
+## Inside multiprocessing {#anim-processes data-state="anim-slide" background-iframe="anim/processes.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -175,7 +175,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: A big box labeled your notebook holds a small memory panel with tasks = \[...\] and run, labeled from fire.py. Pool(4) starts four worker boxes on the right, each labeled a fresh Python with its own empty memory, and the caption says each worker is a separate Python process with its own memory. A small file icon, import fire, travels along the pipes and slides into each worker's memory, because workers start fresh and import your function from a file, which is why it lives in fire.py and not in a notebook cell. The task (0.60, 28) goes into a parcel labeled pickled, travels along a pipe to worker 1 and is unpacked, worker 1 turns red, the result 0.56 travels back in its own parcel, and then parcels flow to all four workers at once. A callout says every parcel costs time: a lot of work per parcel is worth it, but with tiny work the shipping costs more than the work.]{.visually-hidden}
 
-## pool.map, step by step {#anim-pool-map background-iframe="anim/pool-map.html" background-interactive="true"}
+## pool.map, step by step {#anim-pool-map data-state="anim-slide" background-iframe="anim/pool-map.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -193,7 +193,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # Demo 1: spread it across cores {.divider background-color="#CC0000"}
 
-## One task, then a thousand {#anim-fire background-iframe="anim/fire.html" background-interactive="true"}
+## One task, then a thousand {#anim-fire data-state="anim-slide" background-iframe="anim/fire.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -209,7 +209,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: A forest 64 cells across with 60% trees stands beside a code card that reads burn(0.60, seed=28, size=64), because one run of a simulation is one function call. The fire spreads through the forest while the burned counter climbs, and the call returns one number, 0.56, the fraction of trees burned, from a run that takes about 40 milliseconds at the workshop's real 450 by 450 size. Three calls with the same seed and tree densities of 45, 60 and 75 percent burn together and return 0.08, 0.56 and 0.99, so different inputs give different answers and seeing the pattern means running it many times. The sweep is 21 densities times 48 seeds, 1,008 calls drawn as tiles with one column per density, and because no call needs another's result it is embarrassingly parallel and takes about 37 seconds one after another. The tiles become dots on a plot of the fraction of trees burned against tree density, with a red mean line that rises steeply at the tipping point near 59% trees, and a banner says the same 1,008 runs come next on 14 cores.]{.visually-hidden}
 
-## 1 worker vs. 14 workers {#anim-replay background-iframe="anim/replay.html" background-interactive="true"}
+## 1 worker vs. 14 workers {#anim-replay data-state="anim-slide" background-iframe="anim/replay.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -224,7 +224,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # Demo 2: where the gains level off {.divider background-color="#CC0000"}
 
-## Where the gains level off {#anim-scaling background-iframe="anim/scaling.html" background-interactive="true"}
+## Where the gains level off {#anim-scaling data-state="anim-slide" background-iframe="anim/scaling.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -240,7 +240,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 [Text alternative: A chart of how many times faster the 1,008-forest sweep runs against the number of workers, 1 to 16, with a dashed diagonal marking perfect scaling. Measured on this laptop, the points for 1, 2, 4, 6, 8 and 10 workers rise close to the perfect diagonal. The points for 12, 14 and 16 workers bend flat at about 10 times faster, with bands for the 10 performance cores, the 4 efficiency cores that add a little, and no cores left. Amdahl's law, as an example and not a measurement: if 10% of the work can't be split, the total time never drops below that part, so the faint curve tops out at 10 times. Your machine sets the ceiling; overhead and serial parts lower it.]{.visually-hidden}
 
-## Your ceiling {#anim-ceilings background-iframe="anim/ceilings.html" background-interactive="true"}
+## Your ceiling {#anim-ceilings data-state="anim-slide" background-iframe="anim/ceilings.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -258,7 +258,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # Demo 3: slower than not {.divider background-color="#CC0000"}
 
-## When parallel is slower {#anim-overhead background-iframe="anim/overhead.html" background-interactive="true"}
+## When parallel is slower {#anim-overhead data-state="anim-slide" background-iframe="anim/overhead.html" background-interactive="true"}
 
 ::: {.fragment}
 :::
@@ -273,7 +273,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 
 # Your own work {.divider background-color="#CC0000"}
 
-## Where to go next {#tool-ladder background-iframe="anim/tool-ladder.html" background-interactive="true"}
+## Where to go next {#tool-ladder data-state="anim-slide" background-iframe="anim/tool-ladder.html" background-interactive="true"}
 
 ::: {.fragment}
 :::

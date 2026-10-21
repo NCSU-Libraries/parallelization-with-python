@@ -90,7 +90,7 @@ def wire():
         j = i + 1                                         # the slide runs to the next heading
         while j < len(lines) and not re.match(r"^#{1,2} ", lines[j]):
             j += 1
-        block = [f'## {md(d["title"])} {{#{sid} background-iframe="anim/{page}" background-interactive="true"}}', ""]
+        block = [f'## {md(d["title"])} {{#{sid} data-state="anim-slide" background-iframe="anim/{page}" background-interactive="true"}}', ""]
         for _ in range(d["beats"]):
             block += ["::: {.fragment}", ":::", ""]
         block += [f'[Text alternative: {md(" ".join(d["alt"]))}]{{.visually-hidden}}', ""]
