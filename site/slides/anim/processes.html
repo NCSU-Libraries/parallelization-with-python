@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside multiprocessing</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A7: inside multiprocessing. Your notebook on the left, four worker processes on the right, pipes between them.
+     Gray parcels carry pickled tasks and results (gray is overhead, as in the lanes). A busy worker turns red. */
+  #layer { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+  .box   { position: absolute; background: var(--paper); border: 4px solid var(--overhead); border-radius: 26px; }
+  .abs   { position: absolute; margin: 0; }
+
+  .nb-title { left: 70px; top: 112px; font: 800 26px/1.2 var(--font); color: var(--ink); }
+
+  /* dark memory cards: the same card as the code in cores.html */
+  .mem   { position: absolute; background: var(--ink); color: var(--paper); border-radius: 16px; }
+  .mem .tag { position: absolute; left: 16px; top: 7px; font: 600 22px/1.2 var(--font); font-style: normal; color: var(--overhead); }
+  .mem pre  { position: absolute; left: 16px; top: 38px; margin: 0; font: 400 24px/34px var(--mono); white-space: pre; font-variant-ligatures: none; color: var(--paper); }
+  .mem .from { position: absolute; left: 75px; top: 72px; font: 600 22px/34px var(--font); color: var(--overhead); white-space: nowrap; }
+  .mem .hl   { position: absolute; left: 8px; top: 38px; width: 260px; height: 34px; border-radius: 9px; background: color-mix(in srgb, var(--paper) 18%, transparent); opacity: 0; }
+
+  .cell { left: 70px; top: 500px; width: 276px; height: 48px; padding: 0 16px; background: var(--idle); border-radius: 12px; font: 700 26px/48px var(--mono); color: var(--ink); opacity: 0; }
+
+  .worker .wl { position: absolute; left: 402px; top: 0; bottom: 0; width: 192px; display: flex; flex-direction: column; justify-content: center; }
+  .wl b    { font: 800 26px/1.2 var(--font); color: var(--ink); }
+  .wl span { font: 600 22px/1.2 var(--font); color: var(--muted); }
+  .worker .on { position: absolute; inset: -4px; border-radius: 26px; background: var(--red); opacity: 0; }
+  .worker .on .wl { left: 406px; top: 4px; bottom: 4px; }
+  .on .wl b, .on .wl span { color: var(--paper); }
+  .wm   { left: 12px; top: 6px; width: 376px; height: 86px; }
+  .slot { position: absolute; left: 12px; top: 36px; width: 190px; height: 42px; border: 3px dashed var(--overhead); border-radius: 10px; }
+  .tc   { position: absolute; left: 210px; top: 36px; width: 148px; height: 42px; border: 3px solid var(--paper); border-radius: 10px; font: 700 22px/36px var(--mono); text-align: center; color: var(--paper); opacity: 0; }
+
+  /* the file icon: a page with a folded corner */
+  .chip { position: absolute; left: 0; top: 0; width: 190px; height: 42px; padding-left: 12px; opacity: 0; font: 700 22px/42px var(--mono); color: var(--ink); white-space: nowrap;
+          background: linear-gradient(225deg, var(--line) 0 22.6px, var(--paper) 22.6px); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); border-radius: 8px; }
+
+  .pipe-o { fill: none; stroke: var(--overhead); stroke-width: 24; stroke-linejoin: round; stroke-dasharray: 1; opacity: 0; }
+  .pipe-i { fill: none; stroke: var(--paper); stroke-width: 16; stroke-linejoin: round; stroke-dasharray: 1; opacity: 0; }
+
+  /* parcels are placed by their center: transform translate(x, y) translate(-50%, -50%) */
+  .parcel { position: absolute; left: 0; top: 0; height: 44px; padding: 0 14px; display: flex; align-items: center; opacity: 0; white-space: nowrap;
+            background: var(--overhead); border: 3px solid var(--muted); border-radius: 10px; font: 700 22px/1.25 var(--mono); color: var(--ink); }
+  .plab   { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 3px 10px; background: var(--paper); border: 2px solid var(--line); border-radius: 14px; font: 700 22px/1.1 var(--font); color: var(--ink); }
+
+  .cap { left: 48px; top: 590px; width: 1184px; font: 700 26px/1.25 var(--font); color: var(--ink); opacity: 0; }
+  .cap .r { color: var(--red); }
+  .cap code { margin-right: -5px; padding: 0 8px; border-radius: 8px; background: var(--idle); font: 700 24px var(--mono); }
+  .callout { left: 48px; top: 584px; width: 1184px; height: 86px; padding: 0 28px; display: flex; align-items: center; background: var(--paper); border: 5px dashed var(--overhead); border-radius: 24px; font: 600 25px/1.25 var(--font); color: var(--ink); opacity: 0; }
+  .callout b { font-weight: 800; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Inside multiprocessing</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+  <div id="layer" aria-hidden="true">
+    <div class="box" style="left:48px; top:102px; width:320px; height:460px"></div>
+    <p class="abs nb-title">your notebook</p>
+    <div class="mem" style="left:70px; top:272px; width:276px; height:120px">
+      <i class="tag">memory</i>
+      <i class="hl" id="hl"></i>
+      <pre>tasks = [...]
+run</pre>
+      <span class="from">from fire.py</span>
+    </div>
+    <p class="abs cell" id="cell">Pool(4)</p>
+  </div>
+  <p class="abs cap" id="cap1" aria-hidden="true">Each worker is a <span class="r">separate Python process</span> with its own memory.</p>
+  <p class="abs cap" id="cap2" aria-hidden="true">Workers start fresh, so they import your function from a file. That&rsquo;s why it lives in <code>fire.py</code>, not in a notebook cell.</p>
+  <p class="abs callout" id="callout" aria-hidden="true"><span><b>Every parcel costs time.</b> A lot of work per parcel is worth it. With tiny work, the shipping costs more than the work.</span></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art"), layer = $("layer");
+
+// ---- geometry (stage pixels) ------------------------------------------------------------------------------------------
+const WX = 620, WW = 612, WH = 106, WY = [102, 220, 338, 456];     // the four worker boxes
+const CY = WY.map(y => y + WH / 2);                                 // the center line of each worker: where its pipe arrives
+const TY = 332, BUS = 440, NB = 368;                                // trunk height, the bus, the notebook's right edge
+const START = [400, TY];                                            // where parcels and chips leave the notebook
+const DOOR = i => [556, CY[i]];                                     // a parcel stops at its worker's door
+const SLOT = i => [648 + 95, WY[i] + 46 + 21];                      // the middle of a worker's empty slot
+const T = (x, y, s = 1) => `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${s})`;
+const N = 4;
+
+// ---- the pipes: a trunk out of the notebook, a bus, and one branch to each worker ---------------------------------------
+const gOut = svg("g", {}, art), gIn = svg("g", {}, art);
+const pipes = WY.map((_, i) => {
+  const d = `M${NB},${TY} H${BUS} V${CY[i]} H${WX}`;
+  return [svg("path", { class: "pipe-o", d, pathLength: 1 }, gOut), svg("path", { class: "pipe-i", d, pathLength: 1 }, gIn)];
+});
+
+// ---- the workers ----------------------------------------------------------------------------------------------------------
+const workers = WY.map((y, i) => {
+  const w = document.createElement("div");
+  w.className = "box worker";
+  Object.assign(w.style, { left: WX + "px", top: y + "px", width: WW + "px", height: WH + "px", opacity: 0 });
+  const lab = `<b>worker ${i + 1}</b><span>a fresh Python</span>`;
+  w.innerHTML = `<div class="wl">${lab}</div><div class="on"><div class="wl">${lab}</div></div>` +
+    `<div class="mem wm"><i class="tag">memory</i><i class="slot"></i><span class="tc">(d, s)</span>` +
+    (i === 0 ? '<span class="tc tc0">(0.60, 28)</span>' : "") + `</div>`;
+  layer.appendChild(w);
+  return { box: w, on: w.querySelector(".on"), tc: w.querySelector(".tc:not(.tc0)"), tc0: w.querySelector(".tc0") };
+});
+const chips = WY.map((y, i) => {                                    // the file icon, parked on the slot it will fill
+  const c = document.createElement("div");
+  c.className = "chip";
+  c.textContent = "import fire";
+  Object.assign(c.style, { left: "648px", top: (y + 46) + "px" });
+  layer.appendChild(c);
+  return c;
+});
+
+// ---- parcels: the first task, its result, and one for each worker ----------------------------------------------------------
+function parcel(text, label) {
+  const p = document.createElement("div");
+  p.className = "parcel";
+  p.innerHTML = `<span>${text}</span>` + (label ? `<i class="plab">${label}</i>` : "");
+  layer.appendChild(p);
+  return p;
+}
+const pA = parcel("(0.60, 28)", "pickled"), pB = parcel("0.56", "pickled");
+const pS = WY.map(() => parcel("(d, s)"));
+
+const cell = $("cell"), hl = $("hl"), cap1 = $("cap1"), cap2 = $("cap2"), callout = $("callout");
+const set = (el, v, tf = "") => { el.style.opacity = v; el.style.transform = tf; };
+const STAGED = i => [530, CY[i]];                                    // beat 4: the next parcels wait on the pipes
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "A big box labeled your notebook holds a small memory panel with tasks = [...] and run, labeled from fire.py.",
+    "Pool(4) starts four worker boxes on the right, each labeled a fresh Python with its own empty memory, and the caption says each worker is a separate Python process with its own memory.",
+    "A small file icon, import fire, travels along the pipes and slides into each worker's memory, because workers start fresh and import your function from a file, which is why it lives in fire.py and not in a notebook cell.",
+    "The task (0.60, 28) goes into a parcel labeled pickled, travels along a pipe to worker 1 and is unpacked, worker 1 turns red, the result 0.56 travels back in its own parcel, and then parcels flow to all four workers at once.",
+    "A callout says every parcel costs time: a lot of work per parcel is worth it, but with tiny work the shipping costs more than the work.",
+  ],
+
+  render(n) {
+    set(cell, n >= 1 ? 1 : 0);
+    for (const [o, i] of pipes) { set(o, n >= 1 ? 1 : 0); set(i, n >= 1 ? 1 : 0); }
+    workers.forEach(w => { set(w.box, n >= 1 ? 1 : 0); set(w.on, n >= 3 ? 1 : 0); set(w.tc, n >= 3 ? 1 : 0); if (w.tc0) set(w.tc0, 0); });
+    chips.forEach(c => set(c, n >= 2 ? 1 : 0));
+    set(hl, 0); set(pA, 0, T(...START)); set(pB, 0, T(...START));
+    pS.forEach((p, i) => n === 4 ? set(p, 1, T(...STAGED(i))) : set(p, 0, T(...START)));
+    set(cap1, n === 1 ? 1 : 0); set(cap2, n === 2 ? 1 : 0); set(callout, n === 4 ? 1 : 0);
+  },
+
+  enter(n, { animate }) {
+    const fade = (el, a, b, delay = 0, dur = 400) => animate(el, [{ opacity: a }, { opacity: b }], { delay, duration: dur });
+    const rise = (el, delay, dy = 14, dur = 500) => animate(el, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "translateY(0px)" }], { delay, duration: dur });
+    const popIn = (el, delay, dur = 400) => animate(el, [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "scale(1)" }], { delay, duration: dur, easing: EASE.pop });
+    // move an element along a polyline: keyframes are spaced by distance, so the speed is steady and the easing is overall
+    const travel = (el, pts, delay, dur, tf, fadeIn) => {
+      const cum = [0];
+      for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      const kf = pts.map((p, k) => ({ transform: tf(p), opacity: fadeIn && k === 0 ? 0 : 1, offset: cum[k] / cum[cum.length - 1] }));
+      return animate(el, kf, { delay, duration: dur, easing: EASE.inOut });
+    };
+    const place = p => T(p[0], p[1], 1);
+    const there = i => [START, [BUS, TY], [BUS, CY[i]], DOOR(i)];
+
+    if (n === 1) {
+      rise(cell, 0, 10, 400);
+      pipes.forEach(([o, i], k) => {
+        for (const el of [o, i]) animate(el, [{ opacity: 1, strokeDashoffset: 1 }, { opacity: 1, strokeDashoffset: 0 }], { delay: 300 + k * 80, duration: 700, easing: EASE.inOut });
+      });
+      workers.forEach((w, k) => rise(w.box, 600 + k * 130, 16));
+      rise(cap1, 1100);
+    }
+
+    if (n === 2) {
+      fade(cap1, 1, 0, 0, 300);
+      rise(cap2, 350);
+      chips.forEach((c, i) => {                                      // each icon leaves the notebook and slides into its worker's slot
+        const rest = SLOT(i);
+        travel(c, [START, [BUS, TY], [BUS, CY[i]], [610, CY[i]], rest], i * 160, 1300, p => `translate(${p[0] - rest[0]}px, ${p[1] - rest[1]}px)`, true);
+      });
+    }
+
+    if (n === 3) {
+      const w0 = workers[0], d0 = DOOR(0);
+      fade(cap2, 1, 0, 0, 300);
+      // the first task: out of `tasks`, into a pickled parcel, along the pipe to worker 1
+      animate(hl, [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.75 }, { opacity: 0 }], { delay: 100, duration: 1000 });
+      animate(pA, [{ opacity: 0, transform: T(...START, 0.8) }, { opacity: 1, transform: T(...START, 1) }], { delay: 300, duration: 350 });
+      travel(pA, there(0), 700, 1100, place);
+      // unpacked: the parcel opens, the task lands in worker 1's memory and worker 1 turns red
+      animate(pA, [{ opacity: 1, transform: T(...d0, 1) }, { opacity: 0, transform: T(...d0, 1.2) }], { delay: 1800, duration: 300 });
+      popIn(w0.tc0, 1900);
+      fade(w0.on, 0, 1, 1850);
+      // the result comes back in a parcel of its own
+      animate(pB, [{ opacity: 0, transform: T(...d0, 0.8) }, { opacity: 1, transform: T(...d0, 1) }], { delay: 2700, duration: 300 });
+      fade(w0.tc0, 1, 0, 2700, 300);
+      fade(w0.on, 1, 0, 2700);
+      travel(pB, [d0, [BUS, CY[0]], [BUS, TY], START], 3000, 1000, place);
+      animate(pB, [{ opacity: 1, transform: T(...START, 1) }, { opacity: 0, transform: T(...START, 0.8) }], { delay: 4000, duration: 300 });
+      // then a parcel for every worker at once
+      pS.forEach((p, i) => {
+        const d = DOOR(i), t = i * 60;
+        animate(p, [{ opacity: 0, transform: T(...START, 0.8) }, { opacity: 1, transform: T(...START, 1) }], { delay: 4600 + t, duration: 300 });
+        travel(p, there(i), 4900 + t, 1100, place);
+        animate(p, [{ opacity: 1, transform: T(...d, 1) }, { opacity: 0, transform: T(...d, 1.2) }], { delay: 6000 + t, duration: 300 });
+        popIn(workers[i].tc, 6050 + t);
+        if (i === 0) fade(workers[0].on, 0, 1, 6000 + t); else fade(workers[i].on, 0, 1, 6000 + t);
+      });
+    }
+
+    if (n === 4) {
+      pS.forEach((p, i) => animate(p, [{ opacity: 0, transform: T(...STAGED(i), 0.8) }, { opacity: 1, transform: T(...STAGED(i), 1) }], { delay: 100 + i * 100, duration: 400, easing: EASE.pop }));
+      rise(callout, 300, 14, 600);
+    }
+  },
+});
+</script>
+</body>
+</html>

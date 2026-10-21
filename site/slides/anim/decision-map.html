@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where does your task fit?</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A6: the decision map. A flowchart built one question at a time:
+     questions are rounded boxes, answers are pills on the arrows, endpoints are cards.
+     Yes always goes right, No always goes down. The path to Pool turns red in the last beat; every other endpoint is gray. */
+  #layer { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+  .n { position: absolute; margin: 0; opacity: 0; display: flex; flex-direction: column; justify-content: center; }
+
+  .start { background: var(--ink); color: var(--paper); border-radius: 22px; align-items: center; text-align: center; padding: 0 16px; font: 700 26px/1.1 var(--font); }
+  .q     { background: var(--paper); border: 4px solid var(--overhead); border-radius: 26px; align-items: center; text-align: center; padding: 0 18px; font: 600 24px/1.14 var(--font); color: var(--ink); }
+  .ring  { position: absolute; inset: -4px; border-radius: inherit; border: 5px solid var(--red); box-shadow: 0 0 0 7px color-mix(in srgb, var(--red) 22%, transparent); opacity: 0; pointer-events: none; }
+
+  .card      { background: var(--idle); border: 3px solid var(--overhead); border-radius: 14px; padding: 0 20px; font: 400 24px/1.22 var(--font); color: var(--ink); }
+  .card b    { display: block; font: 700 26px/1.22 var(--font); }
+  .card.one  { align-items: center; text-align: center; }
+  .card.one b { display: inline; }
+  .card.pool { background: var(--red); border-color: var(--red-deep); color: var(--paper); }
+  .card.pool code   { display: block; font: 700 24px/1.25 var(--mono); }
+  .card.pool strong { display: block; font: 800 34px/1.15 var(--font); }
+  .glow { position: absolute; inset: -3px; border-radius: 16px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--red) 24%, transparent), 0 0 34px 6px color-mix(in srgb, var(--red) 40%, transparent); opacity: 0; pointer-events: none; }
+
+  .pill    { position: absolute; width: 66px; height: 34px; margin: -17px 0 0 -33px; border-radius: 17px; background: var(--paper); border: 3px solid var(--overhead); font: 700 22px/28px var(--font); color: var(--ink); text-align: center; opacity: 0; }
+  .pill.no { width: 56px; margin-left: -28px; }
+  .pill .on { position: absolute; inset: -3px; border-radius: 17px; background: var(--red); color: var(--paper); line-height: 34px; opacity: 0; }
+
+  .ar   { fill: none; stroke: var(--overhead); stroke-width: 5; stroke-dasharray: 1; }
+  .ah   { fill: var(--overhead); }
+  .halo { fill: none; stroke: color-mix(in srgb, var(--red) 24%, transparent); stroke-width: 20; stroke-dasharray: 1; }
+  .rl   { fill: none; stroke: var(--red); stroke-width: 7; stroke-dasharray: 1; }
+  .rh   { fill: var(--red); }
+
+  .caption { position: absolute; left: 48px; top: 336px; width: 236px; margin: 0; font: 800 40px/1.18 var(--font); color: var(--red); opacity: 0; }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Where does your task fit?</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+  <div id="layer" aria-hidden="true"></div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art"), layer = $("layer");
+
+// ---- geometry (stage pixels) ------------------------------------------------------------------------------------------
+const SX = 64, SW = 196;                       // the start card, left of the first question
+const QX = 308, QW = 460, QH = 64;             // the question boxes: one spine, centered on MID
+const CX = 868, CW = 364;                      // the endpoint cards, right of each question
+const ROW = [144, 270, 396, 522];              // center line of each question
+const MID = QX + QW / 2, YES_X = (QX + QW + CX) / 2;
+const qTop = i => ROW[i] - QH / 2, qBot = i => ROW[i] + QH / 2;
+const CLUSTER = { x: MID - 170, y: 614, w: 340, h: 56 };
+
+const gBase = svg("g", {}, art), gRed = svg("g", {}, art);   // gray arrows, and the red path above them
+
+function box(cls, x, y, w, h, inner) {
+  const d = document.createElement("div");
+  d.className = "n " + cls;
+  Object.assign(d.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
+  d.innerHTML = inner;
+  layer.appendChild(d);
+  return d;
+}
+const ring = () => '<i class="ring"></i>';
+
+// An axis-aligned arrow from (x1, y1) to the tip (x2, y2). pathLength 1 lets one dash offset draw any line.
+function arrow(x1, y1, x2, y2, red) {
+  const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1), L = 16, W = 10;
+  const bx = x2 - dx * L, by = y2 - dy * L, px = Math.abs(dy), py = Math.abs(dx);
+  const line = `M${x1},${y1} L${bx},${by}`;
+  const head = `M${x2},${y2} L${bx + px * W},${by + py * W} L${bx - px * W},${by - py * W} Z`;
+  const a = {
+    line: svg("path", { class: "ar", d: line, pathLength: 1 }, gBase),
+    head: svg("path", { class: "ah", d: head }, gBase),
+  };
+  if (red) Object.assign(a, {                            // only the arrows on the path to Pool get a red twin
+    halo: svg("path", { class: "halo", d: line, pathLength: 1 }, gRed),
+    rline: svg("path", { class: "rl", d: line, pathLength: 1 }, gRed),
+    rhead: svg("path", { class: "rh", d: head }, gRed),
+  });
+  return a;
+}
+function pill(text, x, y, no) {
+  const p = box("pill" + (no ? " no" : ""), 0, 0, 0, 0, text + `<span class="on">${text}</span>`);
+  p.className = "pill" + (no ? " no" : "");           // a pill is not a flex node
+  Object.assign(p.style, { left: x + "px", top: y + "px", width: "", height: "" });
+  return p;
+}
+
+// ---- the chart ----------------------------------------------------------------------------------------------------------
+const start = box("start", SX, ROW[0] - QH / 2, SW, QH, "A task you repeat" + ring());
+const Q = [
+  "Do the pieces need each other’s results?",
+  "Is each piece mostly waiting, for the network or the disk?",
+  "Is it already NumPy or pandas on big arrays?",
+  "Does one machine have enough cores and memory?",
+].map((t, i) => box("q", QX, qTop(i), QW, QH, t + ring()));
+const C = [
+  ["They must talk:", "MPI, Dask (beyond today)", 84],
+  ["Threads or asyncio", "(not today)", 84],
+  ["Vectorize first.", "The library may already use your cores", 112],
+].map(([b, t, h], i) => box("card", CX, ROW[i] - h / 2, CW, h, `<b>${b}</b>${t}`));
+const pool = box("card pool", CX, ROW[3] - 52, CW, 104, '<code>multiprocessing.Pool:</code><strong>today</strong><i class="glow"></i>');
+const cluster = box("card one", CLUSTER.x, CLUSTER.y, CLUSTER.w, CLUSTER.h, "<span><b>A cluster:</b> job arrays</span>");
+
+const A = {                                             // arrows: s1 start to Q1, nI down from Q(I), yI right from Q(I)
+  s1: arrow(SX + SW, ROW[0], QX - 2, ROW[0], true),
+  n1: arrow(MID, qBot(0), MID, qTop(1) - 2, true), n2: arrow(MID, qBot(1), MID, qTop(2) - 2, true), n3: arrow(MID, qBot(2), MID, qTop(3) - 2, true),
+  n4: arrow(MID, qBot(3), MID, CLUSTER.y - 2),
+  y1: arrow(QX + QW, ROW[0], CX - 2, ROW[0]), y2: arrow(QX + QW, ROW[1], CX - 2, ROW[1]),
+  y3: arrow(QX + QW, ROW[2], CX - 2, ROW[2]), y4: arrow(QX + QW, ROW[3], CX - 2, ROW[3], true),
+};
+const P = {
+  n1: pill("No", MID, (qBot(0) + qTop(1)) / 2, true), n2: pill("No", MID, (qBot(1) + qTop(2)) / 2, true),
+  n3: pill("No", MID, (qBot(2) + qTop(3)) / 2, true), n4: pill("No", MID, (qBot(3) + CLUSTER.y) / 2, true),
+  y1: pill("Yes", YES_X, ROW[0]), y2: pill("Yes", YES_X, ROW[1]), y3: pill("Yes", YES_X, ROW[2]), y4: pill("Yes", YES_X, ROW[3]),
+};
+const caption = document.createElement("p");
+caption.className = "caption";
+caption.textContent = "Where did your task land?";
+layer.appendChild(caption);
+
+// ---- what is on screen at each beat -----------------------------------------------------------------------------------
+const arr = a => [a.line, a.head];
+const parts = [                                          // {els, from: first beat, dim: fades in the last beat}
+  { els: [start], from: 0 },
+  { els: [...arr(A.s1), Q[0]], from: 1 }, { els: [...arr(A.y1), P.y1, C[0]], from: 1, dim: true },
+  { els: [...arr(A.n1), P.n1, Q[1]], from: 2 }, { els: [...arr(A.y2), P.y2, C[1]], from: 2, dim: true },
+  { els: [...arr(A.n2), P.n2, Q[2]], from: 3 }, { els: [...arr(A.y3), P.y3, C[2]], from: 3, dim: true },
+  { els: [...arr(A.n3), P.n3, Q[3]], from: 4 },
+  { els: [...arr(A.y4), P.y4, pool], from: 4 },
+  { els: [...arr(A.n4), P.n4, cluster], from: 4, dim: true },
+];
+const onPath = [A.s1, A.n1, A.n2, A.n3, A.y4];           // the red path: start, three No answers, one Yes
+const rings = [start, ...Q].map(q => q.querySelector(".ring"));
+const redPills = [P.n1, P.n2, P.n3, P.y4].map(p => p.querySelector(".on"));
+const glow = pool.querySelector(".glow");
+const redEls = [...onPath.flatMap(a => [a.halo, a.rline, a.rhead]), ...rings, ...redPills, glow, caption];
+
+const set = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+
+defineAnimation({
+  beats: 5,
+  alt: [
+    "A start card reads: A task you repeat.",
+    "The first question, do the pieces need each other's results, answers yes with a gray card: they must talk, MPI, Dask (beyond today).",
+    "The second question, is each piece mostly waiting for the network or the disk, answers yes with a gray card: threads or asyncio (not today).",
+    "The third question, is it already NumPy or pandas on big arrays, answers yes with a gray card: vectorize first, the library may already use your cores.",
+    "The fourth question, does one machine have enough cores and memory, answers no with a gray card, a cluster with job arrays, and yes with a red card: multiprocessing.Pool, today.",
+    "The path through three no answers and one yes lights up red and ends at multiprocessing.Pool, the other cards dim, and the caption asks: Where did your task land?",
+  ],
+
+  render(n) {
+    for (const p of parts) for (const el of p.els) set(el, n >= p.from ? (n >= 5 && p.dim ? 0.3 : 1) : 0);
+    for (const el of redEls) set(el, n >= 5 ? 1 : 0);
+  },
+
+  enter(n, { animate }) {
+    const rise = (el, delay, dx = 0, dy = 14, dur = 500) =>
+      animate(el, [{ opacity: 0, transform: `translate(${dx}px, ${dy}px)` }, { opacity: 1, transform: "translate(0px, 0px)" }], { delay, duration: dur });
+    const popIn = (el, delay, dur = 350) =>
+      animate(el, [{ opacity: 0, transform: "scale(0.7)" }, { opacity: 1, transform: "scale(1)" }], { delay, duration: dur, easing: EASE.pop });
+    const draw = (a, delay, dur = 450) => {             // the line grows from its start; the head lands as it arrives
+      animate(a.line, [{ opacity: 1, strokeDashoffset: 1 }, { opacity: 1, strokeDashoffset: 0 }], { delay, duration: dur, easing: EASE.inOut });
+      animate(a.head, [{ opacity: 0 }, { opacity: 1 }], { delay: delay + dur - 120, duration: 200 });
+    };
+    const answerYes = (a, p, card, t) => { draw(a, t); popIn(p, t + 150); rise(card, t + 250, 24, 0, 550); };
+
+    if (n === 1) { draw(A.s1, 0, 400); rise(Q[0], 250); answerYes(A.y1, P.y1, C[0], 800); }
+    if (n === 2) { draw(A.n1, 0); popIn(P.n1, 150); rise(Q[1], 450); answerYes(A.y2, P.y2, C[1], 950); }
+    if (n === 3) { draw(A.n2, 0); popIn(P.n2, 150); rise(Q[2], 450); answerYes(A.y3, P.y3, C[2], 950); }
+    if (n === 4) {
+      draw(A.n3, 0); popIn(P.n3, 150); rise(Q[3], 450);
+      draw(A.n4, 950); popIn(P.n4, 1100); rise(cluster, 1200);                     // No: a cluster, in gray
+      draw(A.y4, 1650); popIn(P.y4, 1800); animate(pool, [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "scale(1)" }], { delay: 1900, duration: 600, easing: EASE.pop });
+    }
+    if (n === 5) {
+      for (const p of parts) if (p.dim) for (const el of p.els) animate(el, [{ opacity: 1 }, { opacity: 0.3 }], { duration: 600 });
+      const fade = (el, delay, dur = 350) => animate(el, [{ opacity: 0 }, { opacity: 1 }], { delay, duration: dur });
+      const trace = (a, t, dur = 350) => {              // the red path draws itself, glow first
+        for (const el of [a.halo, a.rline]) animate(el, [{ opacity: 1, strokeDashoffset: 1 }, { opacity: 1, strokeDashoffset: 0 }], { delay: t, duration: dur, easing: EASE.inOut });
+        fade(a.rhead, t + dur - 120, 200);
+      };
+      fade(rings[0], 250);
+      trace(A.s1, 300);
+      fade(rings[1], 600);  trace(A.n1, 650);  fade(redPills[0], 800);
+      fade(rings[2], 950);  trace(A.n2, 1000); fade(redPills[1], 1150);
+      fade(rings[3], 1300); trace(A.n3, 1350); fade(redPills[2], 1500);
+      fade(rings[4], 1650); trace(A.y4, 1700, 400); fade(redPills[3], 1850);
+      fade(glow, 2100, 500);
+      rise(caption, 2300, 0, 12, 600);
+    }
+  },
+});
+</script>
+</body>
+</html>

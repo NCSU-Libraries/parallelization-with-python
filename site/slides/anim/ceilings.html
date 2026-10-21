@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your ceiling</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A13: ceilings. The red curve is this laptop's measured speedup, drawn to scale from data/scaling.json
+     (serial seconds / each pool entry's total seconds). Every other line is a ceiling, not a measurement: "at most". */
+  .grid     { stroke: var(--idle); stroke-width: 3; stroke-linecap: round; }
+  .axis     { stroke: var(--overhead); stroke-width: 4; stroke-linecap: round; }
+  .tick-l   { font: 600 22px var(--font); fill: var(--muted); }
+  .axis-t   { font: 600 24px var(--font); fill: var(--muted); }
+  .halo     { paint-order: stroke; stroke: var(--paper); stroke-width: 8px; stroke-linejoin: round; }
+  .seg      { fill: none; stroke: var(--red); stroke-width: 7; stroke-linecap: round; }
+  .pt       { fill: var(--red); stroke: var(--paper); stroke-width: 4; }
+  .me-l     { font: 800 26px var(--font); fill: var(--red); }
+  .me-s     { font: 700 24px var(--font); fill: var(--muted); }
+  .cap-line { stroke: var(--ink); stroke-width: 7; stroke-linecap: round; }
+  .cap-l    { font: 800 26px var(--font); fill: var(--ink); }
+  .cap-s    { font: 700 24px var(--font); fill: var(--muted); }
+  .band-r   { fill: var(--overhead); fill-opacity: .26; }
+  .band-e   { stroke: var(--overhead); stroke-width: 4; stroke-dasharray: 4 10; stroke-linecap: round; }
+  .dash     { stroke: var(--muted); stroke-width: 7; stroke-linecap: round; }
+  .arrow    { fill: none; stroke: var(--muted); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+
+  .t { position: absolute; margin: 0; opacity: 0; }
+  #cap { left: 48px; top: 612px; width: 1184px; height: 60px; display: flex; align-items: center; justify-content: center;
+         border: 4px solid var(--red); border-radius: 22px; background: var(--paper); font: 800 28px/1.2 var(--font); color: var(--ink); white-space: nowrap; }
+  #cap span { color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Your ceiling</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+  <p class="t" id="cap" aria-hidden="true">The notebook draws&nbsp;<span>your own curve.</span>&nbsp;Share your number in the chat.</p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+const show = (el, on) => { el.style.opacity = on ? 1 : 0; el.style.transform = ""; };
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+
+// ---- geometry, in stage pixels. Every position comes from X and Y, so every tick is a real value. ------------------
+const P = { x0: 150, x1: 1090, y0: 124, y1: 520 };
+const X = w => P.x0 + (P.x1 - P.x0) * w / 16;
+const Y = s => P.y1 - (P.y1 - P.y0) * s / 16;
+const S = {};
+
+function lines(parent, attrs, rows) {                 // rows: [[class, text], ...], one tspan per line
+  const t = svg("text", attrs, parent);
+  rows.forEach(([c, s, dy], i) => svg("tspan", { class: c, x: attrs.x, dy: i ? dy : 0, text: s }, t));
+  return t;
+}
+
+function setup(ctx, data) {
+  const serial = data.serial.seconds, cpus = data.machine.cpu_count;
+  const pts = data.pool.map(p => ({ w: p.workers, s: serial / p.total.seconds }));
+  const top = Math.round(Math.max(...pts.map(p => p.s)));
+
+  // axes: a tick at every measured worker count, and every 2 times faster
+  const gA = svg("g", {}, art);
+  for (let s = 2; s <= 16; s += 2) {
+    svg("line", { class: "grid", x1: P.x0, x2: P.x1, y1: Y(s), y2: Y(s) }, gA);
+    svg("text", { class: "tick-l", x: P.x0 - 18, y: Y(s), dy: "0.35em", "text-anchor": "end", text: s }, gA);
+  }
+  for (const p of pts) {
+    svg("line", { class: "grid", x1: X(p.w), x2: X(p.w), y1: P.y0, y2: P.y1 }, gA);
+    svg("text", { class: "tick-l", x: X(p.w), y: P.y1 + 36, "text-anchor": "middle", text: p.w }, gA);
+  }
+  svg("line", { class: "axis", x1: P.x0, x2: P.x1, y1: P.y1, y2: P.y1 }, gA);
+  svg("line", { class: "axis", x1: P.x0, x2: P.x0, y1: P.y0, y2: P.y1 }, gA);
+  svg("text", { class: "axis-t", x: (P.x0 + P.x1) / 2, y: 596, "text-anchor": "middle", text: "workers" }, gA);
+  const my = (P.y0 + P.y1) / 2;
+  svg("text", { class: "axis-t", x: 72, y: my, "text-anchor": "middle", transform: `rotate(-90 72 ${my})`, text: "times faster" }, gA);
+
+  // beat 2: a band from 8 to 12 times faster (under the curve)
+  S.band = svg("g", {}, art);
+  S.bandRect = svg("rect", { class: "band-r fb", x: P.x0, y: Y(12), width: P.x1 - P.x0, height: Y(8) - Y(12) }, S.band);
+  S.bandEdges = svg("g", {}, S.band);
+  for (const s of [12, 8]) svg("line", { class: "band-e", x1: P.x0, x2: P.x1, y1: Y(s), y2: Y(s) }, S.bandEdges);
+  S.bandLabel = lines(S.band, { class: "halo", x: P.x0 + 20, y: Y(12) + 38 }, [["cap-l", "a typical laptop: 8–12 cores"], ["cap-s", "at most 8–12×", 30]]);
+
+  // beat 3: a dashed line that rises off the chart, along "perfect" scaling and on past the top
+  S.cluster = svg("g", {}, art);
+  const x0 = X(0), y0 = Y(0), dx = X(16) - x0, dy = Y(16) - y0, run = Math.hypot(dx, dy), ux = dx / run, uy = dy / run;
+  const L = run + 46, tip = [x0 + ux * L, y0 + uy * L];
+  S.dashes = [];
+  for (let s = 0; s + 30 < L; s += 36) {
+    const e = Math.min(s + 22, L - 30);
+    S.dashes.push(svg("line", { class: "dash", x1: x0 + ux * s, y1: y0 + uy * s, x2: x0 + ux * e, y2: y0 + uy * e }, S.cluster));
+  }
+  const bk = 26, wing = 15;                           // the arrowhead: two short strokes back from the tip
+  S.arrow = svg("path", { class: "arrow", d: `M${tip[0] - ux * bk - uy * wing} ${tip[1] - uy * bk + ux * wing}L${tip[0]} ${tip[1]}L${tip[0] - ux * bk + uy * wing} ${tip[1] - uy * bk - ux * wing}` }, S.cluster);
+  S.clLabel = lines(S.cluster, { class: "halo", x: 930, y: 150, "text-anchor": "end" }, [["cap-l", "a cluster node: dozens of cores"], ["cap-s", "at most dozens of times faster", 30]]);
+
+  // beat 1: Google Colab, a cap line at 2 times faster
+  S.colab = svg("g", {}, art);
+  S.colabLine = svg("line", { class: "cap-line", x1: P.x0, x2: P.x1, y1: Y(2), y2: Y(2) }, S.colab);
+  S.colabLen = P.x1 - P.x0;
+  S.colabLine.style.strokeDasharray = `${S.colabLen} ${S.colabLen + 60}`;
+  S.colabLabel = lines(S.colab, { class: "halo", x: P.x1, y: Y(2) - 18, "text-anchor": "end" }, [["cap-l", "Google Colab: 2 cores, at most 2×"]]);
+
+  // beat 0: this laptop's measured curve, straight segments between the measured points
+  const gM = svg("g", {}, art);
+  pts.forEach((p, k) => {
+    if (k) svg("path", { class: "seg", d: `M${X(pts[k - 1].w)} ${Y(pts[k - 1].s)}L${X(p.w)} ${Y(p.s)}` }, gM);
+  });
+  pts.forEach(p => svg("circle", { class: "pt", cx: X(p.w), cy: Y(p.s), r: 10 }, gM));
+  lines(gM, { class: "halo", x: P.x1, y: 364, "text-anchor": "end" }, [["me-l", `this laptop: ${cpus} cores`], ["me-s", `measured, tops out near ${top}×`, 30]]);
+
+  S.cap = $("cap");
+}
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "The measured speedup curve of this 14-core laptop: times faster against workers, flattening near 10 times faster.",
+    "A cap line at 2 times faster marks Google Colab: 2 cores, at most 2 times faster.",
+    "A band from 8 to 12 times faster marks a typical laptop: 8 to 12 cores, at most 8 to 12 times faster.",
+    "A dashed line rising off the top of the chart marks a cluster node: dozens of cores, at most dozens of times faster.",
+    "The notebook draws your own curve; share your number in the chat.",
+  ],
+
+  load: () => Anim.loadJSON("data/scaling.json"),
+  setup,
+
+  render(n) {
+    show(S.colab, n >= 1); S.colabLine.style.strokeDashoffset = 0;
+    show(S.band, n >= 2); S.bandRect.style.transform = "";
+    show(S.cluster, n >= 3);
+    for (const e of [S.bandEdges, S.bandLabel, S.arrow, S.clLabel, S.colabLabel, ...S.dashes]) e.style.opacity = "";
+    show(S.cap, n >= 4);
+  },
+
+  enter(n, { animate }) {
+    if (n === 1) {                                    // the cap line is drawn left to right, then named
+      show(S.colab, true);
+      animate(S.colabLine, [{ strokeDashoffset: S.colabLen }, { strokeDashoffset: 0 }], { duration: 900, delay: 100, easing: EASE.inOut });
+      animate(S.colabLabel, rise(10), { duration: 500, delay: 800 });
+    }
+    if (n === 2) {                                    // the band grows out of its middle
+      show(S.band, true);
+      animate(S.bandRect, [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 700, delay: 100, easing: EASE.out });
+      animate(S.bandEdges, fade(0, 1), { duration: 500, delay: 500 });
+      animate(S.bandLabel, rise(10), { duration: 500, delay: 700 });
+    }
+    if (n === 3) {                                    // dash by dash up the diagonal, off the chart
+      show(S.cluster, true);
+      S.dashes.forEach((d, i) => animate(d, fade(0, 1), { duration: 400, delay: 100 + i * 28 }));
+      const t = 100 + S.dashes.length * 28;
+      animate(S.arrow, fade(0, 1), { duration: 400, delay: t });
+      animate(S.clLabel, rise(10), { duration: 500, delay: t });
+    }
+    if (n === 4) animate(S.cap, rise(14), { duration: 700 });
+  },
+});
+</script>
+</body>
+</html>

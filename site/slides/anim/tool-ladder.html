@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where to go next</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A14: the tool ladder. Four steps rise left to right, one card each; a footer card closes. Each step is placed by hand
+     (left, top, width, height in the markup), and every step's right edge sits on the 48 px margin. */
+  .step, .ghost, .foot { position: absolute; margin: 0; border-radius: 24px; opacity: 0; }
+  .ghost { border: 4px dashed var(--line); }
+  .ghost i { position: absolute; left: 18px; top: 50%; margin-top: -26px; width: 52px; height: 52px; border-radius: 50%;
+             background: var(--idle); color: var(--overhead); font: 800 30px/52px var(--font); text-align: center; font-style: normal; }
+  .step { display: flex; align-items: center; gap: 18px; padding: 0 18px; border: 4px solid var(--line); background: var(--paper); }
+  .badge { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--red); color: var(--paper);
+           font: 800 30px/52px var(--font); text-align: center; font-style: normal; }
+  .txt  { flex: none; }
+  .wide { flex: 1; }
+  .name { margin: 0; font: 800 30px/1.15 var(--font); color: var(--ink); }
+  .name code { font: 700 28px var(--mono); }
+  .line { margin: 4px 0 0; font: 600 24px/1.25 var(--font); color: var(--muted); text-wrap: balance; }
+  .line code { font: 700 22px var(--mono); color: var(--ink); }
+  .nw { white-space: nowrap; }
+  .code { flex: 1; margin: 0; padding: 12px 16px; border-radius: 18px; background: var(--ink); color: var(--paper);
+          font: 400 22px/34px var(--mono); white-space: pre; font-variant-ligatures: none; }
+  .code .kw { color: var(--red-soft); }
+  .foot { display: flex; align-items: center; justify-content: center; gap: 16px; background: var(--red); color: var(--paper);
+          font: 800 30px/1.2 var(--font); white-space: nowrap; }
+  .foot code { font: 700 30px var(--mono); border-bottom: 4px solid color-mix(in srgb, var(--paper) 60%, transparent); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Where to go next</h1>
+
+  <div class="ghost" id="g2" style="left:138px; top:334px; width:1094px; height:110px" aria-hidden="true"><i>2</i></div>
+  <div class="ghost" id="g3" style="left:228px; top:234px; width:1004px; height:92px"  aria-hidden="true"><i>3</i></div>
+  <div class="ghost" id="g4" style="left:318px; top:108px; width:914px;  height:118px" aria-hidden="true"><i>4</i></div>
+
+  <div class="step" id="s1" style="left:48px; top:452px; width:1184px; height:144px" aria-hidden="true">
+    <i class="badge">1</i>
+    <div class="txt" style="width:330px">
+      <p class="name"><code>concurrent.futures</code></p>
+      <p class="line">the same idea, a newer interface</p>
+    </div>
+    <pre class="code"><span class="kw">from</span> concurrent.futures <span class="kw">import</span> ProcessPoolExecutor
+<span class="kw">with</span> ProcessPoolExecutor() <span class="kw">as</span> ex:
+    results = list(ex.map(run, tasks))</pre>
+  </div>
+
+  <div class="step" id="s2" style="left:138px; top:334px; width:1094px; height:110px" aria-hidden="true">
+    <i class="badge">2</i>
+    <div class="txt" style="width:240px">
+      <p class="name">joblib</p>
+      <p class="line">what <span class="nw">scikit-learn's</span> <code>n_jobs</code> uses</p>
+    </div>
+    <pre class="code"><span class="kw">from</span> joblib <span class="kw">import</span> Parallel, delayed
+Parallel(n_jobs=-1)(delayed(run)(t) <span class="kw">for</span> t <span class="kw">in</span> tasks)</pre>
+  </div>
+
+  <div class="step" id="s3" style="left:228px; top:234px; width:1004px; height:92px" aria-hidden="true">
+    <i class="badge">3</i>
+    <div class="txt wide">
+      <p class="name">Dask and Ray</p>
+      <p class="line">bigger data, many machines</p>
+    </div>
+  </div>
+
+  <div class="step" id="s4" style="left:318px; top:108px; width:914px; height:118px" aria-hidden="true">
+    <i class="badge">4</i>
+    <div class="txt wide">
+      <p class="name">A cluster</p>
+      <p class="line">job arrays on NC State's Hazel, and <code>mpi4py</code> when the pieces must talk</p>
+    </div>
+  </div>
+
+  <p class="foot" id="foot" style="left:48px; top:612px; width:1184px; height:56px" aria-hidden="true">Help with your own project: <code>go.ncsu.edu/getdatahelp</code></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { EASE } = Anim;
+const $ = id => document.getElementById(id);
+const show = (el, on) => { el.style.opacity = on ? 1 : 0; el.style.transform = ""; };
+const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+
+const STEPS = ["s1", "s2", "s3", "s4"].map($);           // beat 0 shows step 1; beat n adds step n + 1; beat 4 adds the footer
+const GHOSTS = { 1: $("g2"), 2: $("g3"), 3: $("g4") };   // a dashed outline marks each step still to come
+const FOOT = $("foot");
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "Step 1 of a four-step ladder: concurrent.futures, the same idea with a newer interface, shown with ProcessPoolExecutor and ex.map.",
+    "Step 2: joblib, what scikit-learn's n_jobs uses, shown with Parallel and delayed.",
+    "Step 3: Dask and Ray, for bigger data and many machines.",
+    "Step 4: a cluster, with job arrays on NC State's Hazel, and mpi4py when the pieces must talk.",
+    "A footer card: for help with your own project, go to go.ncsu.edu/getdatahelp.",
+  ],
+
+  render(n) {
+    STEPS.forEach((s, i) => show(s, n >= i));
+    for (const i in GHOSTS) show(GHOSTS[i], n < +i);
+    show(FOOT, n >= 4);
+  },
+
+  enter(n, { animate }) {
+    // a step rises into place over its dashed outline; the footer rises last
+    if (n >= 1 && n <= 3) animate(STEPS[n], rise(40), { duration: 750 });
+    if (n === 4) animate(FOOT, rise(24), { duration: 700 });
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where parallelism lives</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A5: where parallelism lives. A zoom out: each level shrinks into the next. The chip is drawn as in A1 (cores.html). */
+  .chip-base  { fill: var(--idle); }
+  .chip-plate { fill: var(--paper); stroke: var(--line); stroke-width: 5; }
+  .chip-pin   { fill: var(--line); }
+  .c-dim  { fill: var(--idle); stroke: var(--overhead); stroke-width: 3; }
+  .c-lit  { fill: var(--red); stroke: var(--red-deep); stroke-width: 3; }
+  .board  { fill: var(--idle); stroke: var(--line); stroke-width: 5; }
+  .gpu    { fill: var(--paper); stroke: var(--line); stroke-width: 4; }
+  .g-dim  { fill: var(--line); }
+  .g-lit  { fill: var(--red); }
+  .rack   { fill: none; stroke: var(--line); stroke-width: 4; }
+  .part   { font: 800 26px var(--font); fill: var(--ink); }
+
+  /* the breadcrumb along the top: the current level is dark with a red bar under it */
+  .crumbs { position: absolute; left: 0; top: 96px; width: 1280px; display: flex; justify-content: center; gap: 22px; margin: 0; font: 700 30px/36px var(--font); white-space: nowrap; }
+  .crumb  { position: relative; color: var(--muted); }
+  .crumb .bar { position: absolute; left: 0; right: 0; bottom: -8px; height: 6px; border-radius: 3px; background: var(--red); opacity: 0; }
+  .sep    { color: var(--overhead); }
+  .here-wrap { position: absolute; left: -60px; right: -60px; top: calc(100% + 22px); display: flex; justify-content: center; pointer-events: none; }
+  .here { position: relative; display: block; height: 34px; padding: 0 16px; border-radius: 17px; background: var(--red); color: var(--paper); font: 800 22px/34px var(--font); font-style: normal; opacity: 0; }
+  .here::before { content: ""; position: absolute; top: -8px; left: 50%; margin-left: -9px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 9px solid var(--red); }
+
+  .tag { position: absolute; left: 798px; top: 197px; height: 44px; padding: 0 22px; border-radius: 22px; background: var(--red); color: var(--paper); font: 800 26px/44px var(--font); opacity: 0; }
+  .lbl { position: absolute; left: 160px; width: 960px; top: 594px; margin: 0; text-align: center; font: 600 32px/1.12 var(--font); color: var(--ink); text-wrap: balance; opacity: 0; }
+  .lbl b { font-weight: 800; }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Where parallelism lives</h1>
+
+  <nav class="crumbs" aria-hidden="true">
+    <span class="crumb" id="cr0">core<i class="bar"></i></span><span class="sep">&rsaquo;</span>
+    <span class="crumb" id="cr1">chip<i class="bar"></i><span class="here-wrap"><em class="here" id="here">You are here</em></span></span><span class="sep">&rsaquo;</span>
+    <span class="crumb" id="cr2">computer<i class="bar"></i></span><span class="sep">&rsaquo;</span>
+    <span class="crumb" id="cr3">cluster<i class="bar"></i></span>
+  </nav>
+
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true">
+    <defs>
+      <!-- the GPU's tiny cores: a dense grid, in gray and in red -->
+      <pattern id="gDim" width="13" height="13" patternUnits="userSpaceOnUse"><rect class="g-dim" x="1.5" y="1.5" width="10" height="10" rx="2.5"/></pattern>
+      <pattern id="gLit" width="13" height="13" patternUnits="userSpaceOnUse"><rect class="g-lit" x="1.5" y="1.5" width="10" height="10" rx="2.5"/></pattern>
+      <pattern id="gLitMini" x="79" y="15" width="6" height="6" patternUnits="userSpaceOnUse"><rect class="g-lit" x="0.8" y="0.8" width="4.4" height="4.4" rx="1"/></pattern>
+    </defs>
+  </svg>
+
+  <span class="tag" id="tag" aria-hidden="true">today</span>
+  <p class="lbl" id="lbl0" aria-hidden="true"><b>One core:</b> a plain loop</p>
+  <p class="lbl" id="lbl1" aria-hidden="true"><b>One chip:</b> multiprocessing, concurrent.futures, joblib</p>
+  <p class="lbl" id="lbl2" aria-hidden="true"><b>One computer:</b> a GPU adds thousands of small cores: PyTorch, CuPy, Numba</p>
+  <p class="lbl" id="lbl3" aria-hidden="true"><b>Many computers:</b> a cluster such as NC&nbsp;State's Hazel. Job arrays, Dask, Ray, mpi4py</p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+const tr = (x, y) => `translate(${Math.round(x * 100) / 100}px, ${Math.round(y * 100) / 100}px)`;
+const CX = 640, CY = 392;                                      // the middle of the picture; every level is centered here
+
+// ---- the chip, in A1's look, at any width (A1's plate is 720 wide) ---------------------------------------------------
+// 10 performance cores in two rows, 4 efficiency cores under them. Every core is a dim layer and a red layer.
+function drawChip(parent, cx, cy, w) {
+  const k = w / 720, h = 432 * k, PIN = 14 * k, x = cx - w / 2, y = cy - h / 2;
+  const sw = (k >= 0.3 ? Math.max(2, 3 * k) : 0.9) + "px", psw = Math.max(2, 5 * k) + "px";
+  const g = svg("g", {}, parent);
+  svg("rect", { class: "chip-base", x, y: y + PIN, width: w, height: h, rx: 40 * k }, g);
+  for (let i = 0; i < 11; i++) {                               // pins along the long sides
+    const px = x + 46 * k + i * ((w - 92 * k - 31 * k) / 10);
+    svg("rect", { class: "chip-pin", x: px, y: y - PIN, width: 31 * k, height: PIN + 8 * k, rx: 6 * k }, g);
+    svg("rect", { class: "chip-pin", x: px, y: y + h - 8 * k, width: 31 * k, height: PIN + 8 * k, rx: 6 * k }, g);
+  }
+  for (let i = 0; i < 7; i++) {                                // and the short ones
+    const py = y + 46 * k + i * ((h - 92 * k - 31 * k) / 6);
+    svg("rect", { class: "chip-pin", x: x - PIN, y: py, width: PIN + 8 * k, height: 31 * k, rx: 6 * k }, g);
+    svg("rect", { class: "chip-pin", x: x + w - 8 * k, y: py, width: PIN + 8 * k, height: 31 * k, rx: 6 * k }, g);
+  }
+  svg("rect", { class: "chip-plate", x, y, width: w, height: h, rx: 38 * k, style: { strokeWidth: psw } }, g);
+  svg("circle", { class: "chip-pin", cx: x + 26 * k, cy: y + 26 * k, r: 8 * k }, g);
+  const PC = 110 * k, EC = 72 * k, GAP = 17 * k;
+  const px0 = x + (w - (5 * PC + 4 * GAP)) / 2, py0 = y + 46 * k;
+  const eX0 = x + (w - (4 * EC + 3 * GAP)) / 2, eY = py0 + 2 * PC + GAP + 30 * k;
+  const cores = [];
+  const core = (x0, y0, s, r) => {
+    const at = { x: x0, y: y0, width: s, height: s, rx: r, style: { strokeWidth: sw } };
+    svg("rect", Object.assign({ class: "c-dim" }, at), g);
+    const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), g);
+    lit.style.opacity = 0;
+    cores.push({ lit, x: x0 + s / 2, y: y0 + s / 2, s });
+  };
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) core(px0 + c * (PC + GAP), py0 + r * (PC + GAP), PC, 24 * k);
+  for (let c = 0; c < 4; c++) core(eX0 + c * (EC + GAP), eY, EC, 17 * k);
+  return { g, cores };
+}
+
+// ---- the four levels, each drawn where it stands at its own beat --------------------------------------------------------
+const scene = (el, on) => { el.style.opacity = on ? 1 : 0; el.style.transform = ""; };
+const ORIGIN = `${CX}px ${CY}px`;
+
+// level 0: one core, big
+const gCore = svg("g", {}, art);
+svg("rect", { class: "c-lit", x: CX - 120, y: CY - 120, width: 240, height: 240, rx: 52, style: { strokeWidth: "5px" } }, gCore);
+
+// level 1: the chip, 14 cores
+const gChip = svg("g", {}, art);
+const chip = drawChip(gChip, CX, CY, 576);
+
+// level 2: the computer. The CPU chip, half the size, next to a GPU: a dense grid of tiny cores.
+const BOARD = { x: 220, y: 227, w: 840, h: 330 };              // 5 x the size of a cluster node below
+const CPU = { x: 410, y: 378, w: 288 }, GPU = { x: 602, y: 280, w: 416, h: 195 };
+const gComp = svg("g", {}, art);
+const board = svg("rect", { class: "board", x: BOARD.x, y: BOARD.y, width: BOARD.w, height: BOARD.h, rx: 36 }, gComp);
+const cpu = drawChip(gComp, CPU.x, CPU.y, CPU.w);
+cpu.cores.forEach(c => { c.lit.style.opacity = 1; });
+const gGpu = svg("g", { class: "fb" }, svg("g", { transform: `translate(${GPU.x} ${GPU.y})` }, gComp));   // the outer group places it; the inner one pops
+svg("rect", { class: "gpu", x: 0, y: 0, width: GPU.w, height: GPU.h, rx: 22 }, gGpu);
+svg("rect", { x: 13, y: 13, width: 390, height: 169, fill: "url(#gDim)" }, gGpu);
+const bands = Array.from({ length: 10 }, (_, i) => svg("rect", { x: 13 + 39 * i, y: 13, width: 39, height: 169, fill: "url(#gLit)" }, gGpu));
+const parts = [["CPU", CPU.x], ["GPU", GPU.x + GPU.w / 2]].map(([t, x]) => svg("text", { class: "part", x, y: 508, "text-anchor": "middle", text: t }, gComp));
+
+// level 3: a cluster of racks of nodes. A node is the computer at one fifth of its size.
+const NODE = { w: 168, h: 66, pitch: 76 };
+const gNode = svg("g", { id: "node" }, art.querySelector("defs"));
+svg("rect", { class: "board", x: 0, y: 0, width: NODE.w, height: NODE.h, rx: 12, style: { strokeWidth: "3px" } }, gNode);
+const nodeChip = drawChip(gNode, 38, 30.2, 57.6);
+nodeChip.cores.forEach(c => { c.lit.style.opacity = 1; });
+svg("rect", { class: "gpu", x: 76.4, y: 10.5, width: 83.2, height: 39, rx: 7, style: { strokeWidth: "2.5px" } }, gNode);
+svg("rect", { x: 79, y: 15, width: 78, height: 30, fill: "url(#gLitMini)" }, gNode);
+
+const RACK = { w: 200, h: 326, y: 229, xs: [195, 425, 655, 885] };
+const gClu = svg("g", {}, art);
+const racks = RACK.xs.map(x => svg("rect", { class: "rack", x, y: RACK.y, width: RACK.w, height: RACK.h, rx: 18 }, gClu));
+const nodes = [];
+RACK.xs.forEach(x => [0, 1, 2, 3].forEach(i => nodes.push(svg("use", { href: "#node", class: "fb", x: x + 16, y: RACK.y + 16 + i * NODE.pitch }, gClu))));
+
+// stacking, bottom to top: the level a shrinking level lands in sits under it, so a shrinking level is always seen
+[gClu, gComp, gChip, gCore].forEach(g => art.appendChild(g));
+
+// where one level lands in the next (stage pixels, zoom about the middle of the picture)
+const c0 = chip.cores[0];
+const TO_CHIP = { dx: c0.x - CX, dy: c0.y - CY, s: c0.s / 240 };                          // the big core becomes the chip's first core
+const TO_COMP = { dx: CPU.x - CX, dy: CPU.y - CY, s: CPU.w / 576 };                       // the chip becomes the CPU
+const N0 = { x: RACK.xs[0] + 16, y: RACK.y + 16 };                                          // the first node
+const TO_NODE = { dx: N0.x + NODE.w / 2 - CX, dy: N0.y + NODE.h / 2 - CY, s: NODE.w / BOARD.w };   // the computer becomes a node
+const CPU_IN_NODE = { dx: N0.x + 38 - CX, dy: N0.y + 30.2 - CY, s: 57.6 / 576 };            // the chip's size and place inside that node
+const zoom = z => `${tr(z.dx, z.dy)} scale(${z.s})`;
+[gCore, gChip, gComp].forEach(g => { g.style.transformOrigin = ORIGIN; });
+
+// ---- text, tag, breadcrumb ----------------------------------------------------------------------------------------------
+const lbls = [0, 1, 2, 3].map(i => $("lbl" + i)), tag = $("tag"), here = $("here");
+const crumbs = [0, 1, 2, 3].map(i => $("cr" + i)), bars = crumbs.map(c => c.querySelector(".bar"));
+const INK = Anim.tok("--ink"), MUTED = Anim.tok("--muted");
+const LEVEL = [0, 1, 2, 3, 1];                                 // which crumb is current at each beat (beat 4 is back at the chip)
+const LBL = [0, 1, 2, 3, 1];                                   // and which label shows
+
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }];
+const pop = [{ opacity: 0, transform: "scale(0.84)" }, { opacity: 1, transform: "scale(1)" }];
+const tagPop = [{ opacity: 0, transform: "scale(0.7)" }, { opacity: 1, transform: "scale(1)" }];
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "A breadcrumb along the top reads core, chip, computer, cluster, with core marked, and one big red square stands for a single core, labeled: One core, a plain loop.",
+    "The core shrinks into a chip with 14 cores, drawn as in the first animation, and all 14 light up under a red today tag, with the label: One chip, multiprocessing, concurrent.futures, joblib.",
+    "The chip shrinks into a computer, where the CPU chip sits next to a GPU drawn as a dense grid of tiny cores, with the label: One computer, a GPU adds thousands of small cores, PyTorch, CuPy, Numba.",
+    "The computer shrinks into one node of a cluster of rack nodes, with the label: Many computers, a cluster such as NC State's Hazel, job arrays, Dask, Ray, mpi4py.",
+    "The view zooms back in to the chip, the breadcrumb marks chip with You are here under it, and the label again reads: One chip, multiprocessing, concurrent.futures, joblib.",
+  ],
+
+  render(n) {
+    scene(gCore, n === 0);
+    scene(gChip, n === 1 || n === 4);
+    scene(gComp, n === 2);
+    scene(gClu, n === 3);
+    chip.cores.forEach(c => { c.lit.style.opacity = n >= 1 ? 1 : 0; c.lit.style.transform = ""; });
+    [board, cpu.g, gGpu, ...parts, ...bands, ...racks, ...nodes].forEach(el => scene(el, true));
+    lbls.forEach((el, i) => scene(el, i === LBL[n]));
+    scene(tag, n === 1 || n === 4);
+    scene(here, n === 4);
+    crumbs.forEach((el, i) => {
+      el.style.color = i === LEVEL[n] ? "var(--ink)" : "var(--muted)";
+      scene(bars[i], i === LEVEL[n]);
+    });
+  },
+
+  enter(n, { animate }) {
+    const moveCrumb = (from, to, delay = 0) => {               // the marker moves along the breadcrumb
+      animate(crumbs[from], [{ color: INK }, { color: MUTED }], { duration: 400, delay });
+      animate(bars[from], fade(1, 0), { duration: 400, delay });
+      animate(crumbs[to], [{ color: MUTED }, { color: INK }], { duration: 400, delay });
+      animate(bars[to], fade(0, 1), { duration: 400, delay });
+    };
+    const swapLabel = (from, to, delay = 500) => {
+      animate(lbls[from], fade(1, 0), { duration: 400 });
+      animate(lbls[to], rise, { duration: 500, delay });
+    };
+
+    if (n === 1) {                                             // the core shrinks into the chip, then the other cores light up
+      animate(gCore, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_CHIP) }], { duration: 900, easing: EASE.inOut });
+      animate(gCore, fade(1, 0), { duration: 400, delay: 550 });
+      animate(gChip, fade(0, 1), { duration: 500, delay: 250 });
+      animate(chip.cores[0].lit, fade(0, 1), { duration: 400, delay: 650 });
+      for (let i = 1; i < 14; i++) animate(chip.cores[i].lit, pop, { duration: 400, delay: 1200 + (i - 1) * 90, easing: EASE.pop });
+      animate(tag, tagPop, { duration: 450, delay: 2500, easing: EASE.pop });
+      moveCrumb(0, 1);
+      swapLabel(0, 1, 600);
+    }
+
+    if (n === 2) {                                             // the chip shrinks into the CPU; a GPU, a grid of tiny cores, appears
+      animate(tag, fade(1, 0), { duration: 400 });
+      animate(board, fade(0, 1), { duration: 500 });
+      animate(gChip, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_COMP) }], { duration: 900, delay: 250, easing: EASE.inOut });
+      animate(gChip, fade(1, 0), { duration: 400, delay: 800 });
+      animate(cpu.g, fade(0, 1), { duration: 400, delay: 800 });
+      animate(gGpu, [{ opacity: 0, transform: "scale(0.9)" }, { opacity: 1, transform: "scale(1)" }], { duration: 600, delay: 700, easing: EASE.out });
+      parts.forEach(p => animate(p, fade(0, 1), { duration: 500, delay: 1200 }));
+      bands.forEach((b, i) => animate(b, fade(0, 1), { duration: 450, delay: 1700 + i * 110 }));
+      moveCrumb(1, 2);
+      swapLabel(1, 2, 600);
+      gComp.style.opacity = 1;
+    }
+
+    if (n === 3) {                                             // the computer shrinks into a node; the rest of the cluster appears
+      parts.forEach(p => animate(p, fade(1, 0), { duration: 400 }));
+      animate(gComp, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_NODE) }], { duration: 1000, delay: 150, easing: EASE.inOut });
+      animate(gComp, fade(1, 0), { duration: 400, delay: 800 });
+      gClu.style.opacity = 1;
+      racks.forEach((r, i) => animate(r, fade(0, 1), { duration: 450, delay: 900 + i * 120 }));
+      nodes.forEach((u, i) => animate(u, i === 0 ? fade(0, 1) : pop, i === 0 ? { duration: 400, delay: 800 } : { duration: 400, delay: 1000 + i * 70, easing: EASE.pop }));
+      moveCrumb(2, 3);
+      swapLabel(2, 3, 700);
+    }
+
+    if (n === 4) {                                             // back at the chip: zoom in from the first node's CPU
+      animate(gClu, fade(1, 0), { duration: 600 });
+      gChip.style.opacity = 1;
+      animate(gChip, [{ opacity: 0, transform: zoom(CPU_IN_NODE) }, { opacity: 1, transform: zoom(CPU_IN_NODE), offset: 0.12 }, { opacity: 1, transform: "translate(0px, 0px) scale(1)" }], { duration: 1300, delay: 200, easing: EASE.inOut });
+      animate(tag, tagPop, { duration: 450, delay: 1650, easing: EASE.pop });
+      moveCrumb(3, 1);
+      animate(here, tagPop, { duration: 450, delay: 1850, easing: EASE.pop });
+      swapLabel(3, 1, 1000);
+    }
+  },
+});
+</script>
+</body>
+</html>

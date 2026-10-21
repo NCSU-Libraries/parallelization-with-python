@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the gains level off</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A11: scaling. Times faster against workers, drawn to scale from data/scaling.json
+     (speedup = serial seconds / each pool entry's total seconds). The Amdahl curve is an example, not a measurement. */
+  .grid     { stroke: var(--idle); stroke-width: 3; stroke-linecap: round; }
+  .axis     { stroke: var(--overhead); stroke-width: 4; stroke-linecap: round; }
+  .tick-l   { font: 600 22px var(--font); fill: var(--muted); }
+  .axis-t   { font: 600 24px var(--font); fill: var(--muted); }
+  .halo     { paint-order: stroke; stroke: var(--paper); stroke-width: 8px; stroke-linejoin: round; }
+  .perfect  { fill: none; stroke: var(--overhead); stroke-width: 5; stroke-dasharray: 16 12; stroke-linecap: round; }
+  .perfect-l { font: 800 26px var(--font); fill: var(--muted); }
+  .perfect-s { font: 600 22px var(--font); fill: var(--muted); }
+  .seg      { fill: none; stroke: var(--red); stroke-width: 7; stroke-linecap: round; }
+  .pt       { fill: var(--red); stroke: var(--paper); stroke-width: 4; }
+  .val      { font: 800 24px var(--font); fill: var(--ink); }
+  .b1 { fill: var(--red); fill-opacity: .10; }
+  .b2 { fill: var(--red); fill-opacity: .045; }
+  .b3 { fill: var(--overhead); fill-opacity: .30; }
+  .bsep     { stroke: var(--overhead); stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; }
+  .band-l   { font: 700 22px var(--font); fill: var(--ink); }
+  .am-curve { fill: none; stroke: var(--ink); stroke-opacity: .30; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+  .am-ring  { fill: var(--paper); stroke: var(--ink); stroke-opacity: .45; stroke-width: 4; }
+  .am-l     { font: 700 22px var(--font); fill: var(--muted); }
+  .row-l    { font: 600 22px var(--font); fill: var(--muted); }
+  .bar-s    { fill: var(--ink); }
+  .bar-p    { fill: var(--red); }
+  .floor    { stroke: var(--ink); stroke-opacity: .55; stroke-width: 3; stroke-dasharray: 8 8; stroke-linecap: round; }
+  .floor-l  { font: 700 22px var(--font); fill: var(--muted); }
+
+  .t { position: absolute; margin: 0; opacity: 0; }
+  #card { left: 880px; top: 176px; width: 352px; padding: 20px 22px 22px; border: 4px solid var(--line); border-radius: 26px; background: var(--paper); }
+  #card p { margin: 0; }
+  .c-tag { font: 600 22px/1.25 var(--font); color: var(--muted); }
+  .c-big { margin: 6px 0 4px !important; font: 800 38px/1.15 var(--font); color: var(--ink); }
+  .c-eq  { font: 700 24px/1.4 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .c-eq b { color: var(--red); font-weight: 800; }
+
+  #amHead { left: 880px; top: 108px; width: 352px; }
+  #amHead b { display: block; font: 800 32px/1.15 var(--font); color: var(--ink); }
+  #amHead span { display: block; margin-top: 2px; font: 600 22px/1.3 var(--font); color: var(--muted); }
+  .am-key { left: 880px; width: 352px; display: flex; align-items: center; gap: 12px; font: 700 24px/1.2 var(--font); color: var(--ink); white-space: nowrap; }
+  #amKey1 { top: 190px; } #amKey2 { top: 226px; }
+  .sw { display: block; flex: none; width: 26px; height: 26px; border-radius: 7px; }
+  .sw-d { background: var(--ink); } .sw-r { background: var(--red); }
+  #amCap { left: 880px; top: 560px; width: 352px; font: 800 24px/1.22 var(--font); color: var(--ink); }
+  #amCap span { font-weight: 600; color: var(--red); }
+  #sum { left: 880px; top: 176px; width: 352px; padding-left: 24px; border-left: 8px solid var(--red); }
+  #sum p { margin: 0 0 22px; font: 800 36px/1.18 var(--font); color: var(--ink); text-wrap: balance; }
+  #sum p.r { margin-bottom: 0; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Where the gains level off</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <div class="t" id="card" aria-hidden="true">
+    <p class="c-tag">measured on this laptop</p>
+    <p class="c-big">times faster =</p>
+    <p class="c-eq"><b id="serialS">37 s</b>, plain loop</p>
+    <p class="c-eq">&divide; time with N workers</p>
+  </div>
+
+  <div class="t" id="amHead" aria-hidden="true"><b>Amdahl's law</b><span>an example, not measured</span></div>
+  <p class="t am-key" id="amKey1" aria-hidden="true"><i class="sw sw-d"></i>10% can't be split</p>
+  <p class="t am-key" id="amKey2" aria-hidden="true"><i class="sw sw-r"></i>90% is split up</p>
+  <p class="t" id="amCap" aria-hidden="true">Any part that can't be split sets a floor <span>(Amdahl's law)</span>.</p>
+
+  <div class="t" id="sum" aria-hidden="true">
+    <p>Your machine sets the ceiling.</p>
+    <p class="r">Overhead and serial parts lower it.</p>
+  </div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+const show = (el, on) => { el.style.opacity = on ? 1 : 0; el.style.transform = ""; };
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+
+// ---- geometry, in stage pixels. Every position comes from X and Y, so every tick is a real value. ------------------
+const P = { x0: 150, x1: 830, y0: 118, y1: 566 };
+const X = w => P.x0 + (P.x1 - P.x0) * w / 16;
+const Y = s => P.y1 - (P.y1 - P.y0) * s / 16;
+const FIRST = 6;                                   // points 1..6 (1 to 10 workers) arrive at beat 1; the rest at beat 2
+const FRAC = 0.10, AM_N = [1, 2, 4, 8, 16];        // Amdahl's example: 10% of the work can't be split
+const amS = n => 1 / (FRAC + (1 - FRAC) / n);
+const BAR = { x: 1022, w: 210, top: 282, pitch: 44, h: 28 };
+const S = {};
+
+function lines(parent, attrs, rows, dy) {
+  const t = svg("text", attrs, parent);
+  rows.forEach((s, i) => svg("tspan", { x: attrs.x, dy: i ? dy : 0, text: s }, t));
+  return t;
+}
+const dashFor = len => `${len.toFixed(1)} ${(len + 60).toFixed(1)}`;       // a gap longer than the line: no dot at the end when hidden
+
+function setup(ctx, data) {
+  const serial = data.serial.seconds, perf = data.machine.performance_cores, cpus = data.machine.cpu_count;
+  const pts = data.pool.map(p => ({ w: p.workers, s: serial / p.total.seconds }));
+  $("serialS").textContent = serial.toFixed(1) + " s";
+  S.card = $("card"); S.sum = $("sum");
+  S.amHead = $("amHead"); S.amKey1 = $("amKey1"); S.amKey2 = $("amKey2"); S.amCap = $("amCap");
+
+  // axes: a tick at every measured worker count, and every 2 times faster
+  const gA = svg("g", {}, art);
+  for (let s = 2; s <= 16; s += 2) {
+    svg("line", { class: "grid", x1: P.x0, x2: P.x1, y1: Y(s), y2: Y(s) }, gA);
+    svg("text", { class: "tick-l", x: P.x0 - 18, y: Y(s), dy: "0.35em", "text-anchor": "end", text: s }, gA);
+  }
+  for (const p of pts) {
+    svg("line", { class: "grid", x1: X(p.w), x2: X(p.w), y1: P.y0, y2: P.y1 }, gA);
+    svg("text", { class: "tick-l", x: X(p.w), y: P.y1 + 36, "text-anchor": "middle", text: p.w }, gA);
+  }
+  svg("line", { class: "axis", x1: P.x0, x2: P.x1, y1: P.y1, y2: P.y1 }, gA);
+  svg("line", { class: "axis", x1: P.x0, x2: P.x0, y1: P.y0, y2: P.y1 }, gA);
+  svg("text", { class: "axis-t", x: (P.x0 + P.x1) / 2, y: 648, "text-anchor": "middle", text: "workers" }, gA);
+  const my = (P.y0 + P.y1) / 2;
+  svg("text", { class: "axis-t", x: 72, y: my, "text-anchor": "middle", transform: `rotate(-90 72 ${my})`, text: "times faster" }, gA);
+
+  // beat 2: three bands, from the machine block of the data (over the grid, so their labels hide the gridlines)
+  const bx = [0, perf, cpus, 16].map(X);
+  S.band = ["b1", "b2", "b3"].map((c, i) => {
+    const g = svg("g", {}, art);
+    svg("rect", { class: c, x: bx[i], y: P.y0, width: bx[i + 1] - bx[i], height: P.y1 - P.y0 }, g);
+    if (i) svg("line", { class: "bsep", x1: bx[i], x2: bx[i], y1: P.y0, y2: P.y1 }, g);
+    return g;
+  });
+  const bl = (i, attrs, rows) => lines(S.band[i], Object.assign({ class: "band-l halo" }, attrs), rows, 26);
+  bl(0, { x: bx[1] - 14, y: 542, "text-anchor": "end" }, [`${perf} performance cores`]);
+  bl(1, { x: bx[1] + 12, y: 490 }, [`${cpus - perf} efficiency`, "cores add", "a little"]);
+  bl(2, { x: bx[2] + 10, y: 490 }, ["no", "cores", "left"]);
+
+  // beat 0: the perfect diagonal
+  const gP = svg("g", {}, art);
+  svg("line", { class: "perfect", x1: X(0), y1: Y(0), x2: X(16), y2: Y(16) }, gP);
+  svg("text", { class: "perfect-l halo", x: 700, y: 150, "text-anchor": "end", text: "perfect" }, gP);
+  svg("text", { class: "perfect-s halo", x: 700, y: 178, "text-anchor": "end", text: "twice the workers, twice as fast" }, gP);
+
+  // beat 3: Amdahl's example curve, under the measured points
+  const gAm = svg("g", {}, art);
+  let d = "", len = 0, prev = null;
+  S.amAt = {};                                      // curve length reached at n workers
+  for (let n = 1; n <= 16.001; n += 0.25) {
+    const x = X(n), y = Y(amS(n));
+    if (prev) len += Math.hypot(x - prev[0], y - prev[1]);
+    d += (prev ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+    prev = [x, y];
+    for (const k of AM_N) if (Math.abs(n - k) < 1e-6) S.amAt[k] = len;
+  }
+  S.amCurve = svg("path", { class: "am-curve", d }, gAm);
+  S.amLen = len;
+  S.amCurve.style.strokeDasharray = dashFor(len);
+  S.rings = AM_N.slice(1).map(n => svg("circle", { class: "am-ring fb", cx: X(n), cy: Y(amS(n)), r: 9 }, gAm));
+  S.amLabel = lines(gAm, { class: "am-l halo", x: 826, y: 440, "text-anchor": "end" }, ["example: 10% of", "the work can't", "be split"], 26);
+
+  // beats 1 and 2: the measured points, joined by straight segments (no point is drawn between measurements)
+  const gM = svg("g", {}, art);
+  S.pt = pts.map(() => ({}));
+  pts.forEach((p, k) => {
+    if (!k) return;
+    const a = pts[k - 1], len = Math.hypot(X(p.w) - X(a.w), Y(p.s) - Y(a.s));
+    const seg = S.pt[k].seg = svg("path", { class: "seg", d: `M${X(a.w)} ${Y(a.s)}L${X(p.w)} ${Y(p.s)}` }, gM);
+    seg.style.strokeDasharray = dashFor(len); S.pt[k].len = len;
+  });
+  pts.forEach((p, k) => { S.pt[k].dot = svg("circle", { class: "pt fb", cx: X(p.w), cy: Y(p.s), r: 10 }, gM); });
+  pts.forEach((p, k) => {                            // below and right of each rising point; above the flat ones
+    const flat = k >= FIRST;
+    if (k) S.pt[k].val = svg("text", { class: "val halo", x: X(p.w) + (flat ? 0 : 14), y: Y(p.s) + (flat ? -20 : 26), "text-anchor": flat ? "middle" : "start", text: p.s.toFixed(1) + "×" }, gM);
+  });
+  S.last = pts.length - 1;
+
+  // beat 3: the bar of total time, at 1, 2, 4, 8 and 16 workers
+  S.gBars = svg("g", {}, art);
+  const wS = BAR.w * FRAC;
+  S.rows = AM_N.map((n, r) => {
+    const top = BAR.top + r * BAR.pitch, g = svg("g", {}, S.gBars);
+    const wP = BAR.w * (1 - FRAC) / n, wPrev = r ? BAR.w * (1 - FRAC) / AM_N[r - 1] : 0;
+    svg("text", { class: "row-l", x: 880, y: top + 23, text: n === 1 ? "1 worker" : n + " workers" }, g);
+    svg("rect", { class: "bar-s", x: BAR.x, y: top, width: wS, height: BAR.h }, g);
+    const p = svg("rect", { class: "bar-p fb-l", x: BAR.x + wS, y: top, width: wP, height: BAR.h }, g);
+    return { g, p, from: wPrev / wP };
+  });
+  const fy1 = BAR.top - 10, fy2 = BAR.top + 4 * BAR.pitch + BAR.h + 12;
+  S.floorG = svg("g", {}, S.gBars);
+  svg("line", { class: "floor", x1: BAR.x + wS, x2: BAR.x + wS, y1: fy1, y2: fy2 }, S.floorG);
+  svg("text", { class: "floor-l", x: BAR.x + wS, y: fy2 + 28, "text-anchor": "middle", text: "floor" }, S.floorG);
+}
+
+const T0 = 900, PITCH = 850, GROW = 650;            // beat 3: the first row appears at T0; one row every PITCH ms
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "A chart of how many times faster the 1,008-forest sweep runs against the number of workers, 1 to 16, with a dashed diagonal marking perfect scaling.",
+    "Measured on this laptop, the points for 1, 2, 4, 6, 8 and 10 workers rise close to the perfect diagonal.",
+    "The points for 12, 14 and 16 workers bend flat at about 10 times faster, with bands for the 10 performance cores, the 4 efficiency cores that add a little, and no cores left.",
+    "Amdahl's law, as an example and not a measurement: if 10% of the work can't be split, the total time never drops below that part, so the faint curve tops out at 10 times.",
+    "Your machine sets the ceiling; overhead and serial parts lower it.",
+  ],
+
+  load: () => Anim.loadJSON("data/scaling.json"),
+  setup,
+
+  render(n) {
+    show(S.card, n <= 2);
+    [S.gBars, S.amHead, S.amKey1, S.amKey2, S.amCap].forEach(e => show(e, n === 3));
+    show(S.sum, n === 4);
+    S.pt.forEach((p, k) => {
+      const on = n >= (k < FIRST ? 1 : 2);
+      show(p.dot, on);
+      if (p.seg) { show(p.seg, on); p.seg.style.strokeDashoffset = 0; }
+      if (p.val) show(p.val, on && (n < 3 || k === S.last));
+    });
+    S.band.forEach(b => show(b, n === 2));
+    [S.amCurve, S.amLabel, ...S.rings].forEach(e => show(e, n >= 3));
+    S.amCurve.style.strokeDashoffset = 0;
+    S.rows.forEach(r => { r.g.style.opacity = ""; r.p.style.transform = ""; });
+    S.floorG.style.opacity = "";
+  },
+
+  enter(n, { animate }) {
+    const pop = (el, delay) => animate(el, [{ opacity: 0, transform: "scale(0.2)" }, { opacity: 1, transform: "scale(1)" }], { duration: 500, delay, easing: EASE.pop });
+    const draw = (el, len, delay, dur) => animate(el, [{ strokeDashoffset: len, opacity: 1 }, { strokeDashoffset: 0, opacity: 1 }], { duration: dur, delay, easing: EASE.inOut });
+
+    if (n === 1 || n === 2) {                         // the points arrive one by one, each joined to the last
+      const ks = S.pt.map((_, k) => k).filter(k => (k < FIRST ? 1 : 2) === n);
+      const t0 = n === 1 ? 300 : 450, pitch = n === 1 ? 640 : 800;
+      ks.forEach((k, i) => {
+        const p = S.pt[k], t = t0 + i * pitch;
+        if (p.seg) draw(p.seg, p.len, t - 380, 450);
+        pop(p.dot, t);
+        if (p.val) animate(p.val, fade(0, 1), { duration: 400, delay: t + 250 });
+      });
+      if (n === 2) {
+        const tb = t0 + ks.length * pitch + 100;
+        S.band.forEach((b, i) => animate(b, fade(0, 1), { duration: 700, delay: tb + i * 300 }));
+      }
+    }
+
+    if (n === 3) {
+      [S.gBars, S.amHead, S.amKey1, S.amKey2, S.amCap, S.amCurve, S.amLabel, ...S.rings].forEach(e => show(e, true));
+      animate(S.card, fade(1, 0), { duration: 400 });
+      S.pt.forEach((p, k) => { if (p.val && k < S.last) animate(p.val, fade(1, 0), { duration: 400 }); });
+      S.band.forEach(b => animate(b, fade(1, 0), { duration: 500 }));
+      animate(S.amHead, rise(10), { duration: 500, delay: 300 });
+      animate(S.amKey1, fade(0, 1), { duration: 400, delay: 550 });
+      animate(S.amKey2, fade(0, 1), { duration: 400, delay: 700 });
+      S.rows.forEach((r, i) => {                       // each row starts as long as the one above, then its split part shrinks
+        const a = T0 + i * PITCH;
+        animate(r.g, fade(0, 1), { duration: 300, delay: a });
+        animate(r.p, [{ transform: `scaleX(${r.from})` }, { transform: "scaleX(1)" }], { duration: GROW, delay: a + 150, easing: EASE.inOut });
+        if (i) animate(S.rings[i - 1], [{ opacity: 0, transform: "scale(0.2)" }, { opacity: 1, transform: "scale(1)" }], { duration: 450, delay: a + 150 + GROW, easing: EASE.pop });
+      });
+      // the curve is drawn in step with the rows: each row adds the stretch of curve up to its worker count
+      const Dc = 4 * PITCH + 150 + GROW, kf = [{ strokeDashoffset: S.amLen, offset: 0, easing: "linear" }];
+      for (let i = 1; i < 5; i++) {
+        kf.push({ strokeDashoffset: S.amLen - S.amAt[AM_N[i - 1]], offset: (i * PITCH + 150) / Dc, easing: EASE.inOut });
+        kf.push({ strokeDashoffset: S.amLen - S.amAt[AM_N[i]], offset: (i * PITCH + 150 + GROW) / Dc, easing: "linear" });
+      }
+      animate(S.amCurve, kf, { duration: Dc, delay: T0, easing: "linear" });
+      const tEnd = T0 + 4 * PITCH + 150 + GROW;
+      animate(S.floorG, fade(0, 1), { duration: 450, delay: tEnd });
+      animate(S.amLabel, fade(0, 1), { duration: 450, delay: tEnd });
+      animate(S.amCap, rise(10), { duration: 500, delay: tEnd + 200 });
+    }
+
+    if (n === 4) {
+      for (const e of [S.gBars, S.amHead, S.amKey1, S.amKey2, S.amCap]) animate(e, fade(1, 0), { duration: 500 });
+      animate(S.sum, rise(12), { duration: 700, delay: 450 });
+    }
+  },
+});
+</script>
+</body>
+</html>

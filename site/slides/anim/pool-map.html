@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pool.map, step by step</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A8: pool.map, step by step. Code on the left, the lanes on the right: the loop you know, four workers, the next free
+     worker takes the next task, results land in list order. The last beat sets the loop line beside the Pool lines.
+     The 12 tasks are a cartoon: their lengths are made up, so no time is printed. */
+  .code { position: absolute; left: 48px; top: 120px; width: 706px; height: 378px; background: var(--ink); border-radius: 22px; }
+  .ln   { position: absolute; left: 22px; height: 38px; margin: 0; font: 400 24px/38px var(--mono); letter-spacing: -0.04em; white-space: pre; font-variant-ligatures: none; color: var(--paper); opacity: 0; }
+  .kw   { color: var(--red-soft); }
+  .cm   { color: var(--overhead); }
+  .hl   { position: absolute; left: 8px; right: 8px; height: 38px; border-radius: 10px; background: color-mix(in srgb, var(--paper) 16%, transparent); box-shadow: inset 5px 0 0 var(--red-soft); opacity: 0; }
+
+  .lab  { position: absolute; left: 770px; top: 120px; width: 462px; margin: 0; font: 800 28px/1.2 var(--font); color: var(--ink); opacity: 0; }
+  .lab em { font-style: normal; color: var(--red); }
+  .lanes .blk-label { font: 700 22px var(--font); opacity: 1 !important; }   /* a block is only about 34 px wide: the number stays */
+
+  .c-idle { fill: var(--idle); }
+  .c-red  { fill: var(--red); }
+  .c-num  { font: 700 22px var(--font); fill: var(--muted); }
+  .c-numw { font: 700 22px var(--font); fill: var(--paper); }
+  .rlab   { font: 700 22px var(--font); fill: var(--muted); }
+
+  .cmp     { position: absolute; background: var(--ink); border-radius: 22px; color: var(--paper); opacity: 0; }
+  .cmp .tag { position: absolute; left: 22px; top: 12px; font: 600 22px/1.2 var(--font); font-style: normal; color: var(--overhead); }
+  .cmp pre { position: absolute; left: 22px; top: 50px; margin: 0; font: 400 25px/40px var(--mono); white-space: pre; font-variant-ligatures: none; }
+  .cmp .hl { left: 10px; right: 10px; top: 50px; height: 80px; opacity: 1; }
+  .eq      { position: absolute; left: 587px; width: 91px; text-align: center; margin: 0; font: 800 56px/1.2 var(--font); color: var(--ink); opacity: 0; }
+  .cap4    { position: absolute; left: 48px; top: 530px; width: 1184px; margin: 0; text-align: center; font: 800 44px/1.2 var(--font); color: var(--ink); opacity: 0; }
+  .cap4 em { font-style: normal; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">pool.map, step by step</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+  <div id="layer" aria-hidden="true">
+    <div class="code" id="code"><i class="hl" id="hlA"></i><i class="hl" id="hlB"></i></div>
+    <p class="lab" id="lab"></p>
+    <div class="cmp" id="cmpL" style="left:48px; top:210px; width:539px; height:110px"><i class="tag">one core</i>
+<pre>results = [run(t) for t in tasks]</pre></div>
+    <p class="eq" id="eq" style="top:237px">=</p>
+    <div class="cmp" id="cmpR" style="left:678px; top:190px; width:554px; height:150px"><i class="tag">four workers</i><i class="hl"></i>
+<pre>with Pool(4) as pool:
+    results = pool.map(run, tasks)</pre></div>
+    <p class="cap4" id="cap4">Two lines changed. <em>Same answers.</em></p>
+  </div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script src="_shared/lanes.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+
+// ---- the code: nine lines, shown from beat to beat -------------------------------------------------------------------------
+const LINES = [                                           // [line number, first beat, html]
+  [1, 0, '<span class="kw">from</span> multiprocessing <span class="kw">import</span> Pool'],
+  [2, 0, '<span class="kw">from</span> fire <span class="kw">import</span> run'],
+  [4, 0, 'tasks = [(d, s) <span class="kw">for</span> d <span class="kw">in</span> densities <span class="kw">for</span> s <span class="kw">in</span> seeds]'],
+  [6, 0, 'results = [run(t) <span class="kw">for</span> t <span class="kw">in</span> tasks]  <span class="cm"># one core</span>'],
+  [8, 1, '<span class="kw">with</span> Pool(4) <span class="kw">as</span> pool:  <span class="cm"># four workers</span>'],
+  [9, 2, '    results = pool.map(run, tasks)'],
+];
+const code = $("code"), hlA = $("hlA"), hlB = $("hlB");
+const LN_TOP = n => 20 + (n - 1) * 38;
+const lines = LINES.map(([n, from, h]) => {
+  const d = document.createElement("div");
+  d.className = "ln";
+  d.style.top = LN_TOP(n) + "px";
+  d.innerHTML = h;
+  code.appendChild(d);
+  return { el: d, from };
+});
+hlA.style.top = LN_TOP(6) + "px";                         // the loop line
+hlB.style.top = LN_TOP(8) + "px";                         // the with line; it slides down to the map line in beat 2
+
+// ---- the tasks: 12 of slightly different lengths (made up: nothing prints a time) ----------------------------------------------
+const LEN = [1.10, 1.00, 1.20, 1.00, 1.15, 1.00, 1.20, 1.05, 1.00, 1.20, 1.00, 1.10];
+const r2 = v => Math.round(v * 100) / 100;
+const TOTAL = r2(LEN.reduce((a, b) => a + b, 0));         // the loop runs them one after another
+let at = 0;
+const loop = LEN.map((len, i) => { const s = at; at = r2(at + len); return { id: "l" + (i + 1), label: String(i + 1), kind: "task", worker: 0, start: s, end: at }; });
+const free = [0, 0, 0, 0];                                // Pool.map here sends one task at a time: the next free worker takes the next task
+const pool = LEN.map((len, i) => {
+  let w = 0;
+  for (let j = 1; j < free.length; j++) if (free[j] < free[w] - 1e-9) w = j;
+  const s = free[w];
+  free[w] = r2(s + len);
+  return { id: "p" + (i + 1), label: String(i + 1), kind: "task", worker: w, start: s, end: free[w] };
+});
+const T_POOL = Math.max(...pool.map(t => t.end));
+const REPLAY = 17000;                                     // ms for the whole time axis; the four lanes only use the first quarter of it
+const at_ms = t => (t / TOTAL) * REPLAY;
+
+// ---- the lanes -------------------------------------------------------------------------------------------------------------
+let ctx;
+const view = Lanes.create({
+  parent: art, x: 776, y: 214, width: 446, domain: [0, TOTAL], lanes: 4, laneH: 60, gap: 14, inset: 7, blockGap: 3,
+  finLead: 14, labelLift: 10, labels: () => null, axis: false, align: "center", show: 1, animate: (...a) => ctx.animate(...a),
+});
+
+// a row of 12 cells, one per task, in list order; `lit` cells are the red ones that fill in
+function row(x, y, w, gap) {
+  const g = svg("g", {}, art), cw = (w - 11 * gap) / 12, on = [];
+  for (let k = 0; k < 12; k++) {
+    const cx = x + k * (cw + gap), mid = { x: cx + cw / 2, y: y + 23, dy: "0.35em", "text-anchor": "middle" };
+    svg("rect", { class: "c-idle", x: cx, y, width: cw, height: 46, rx: 10 }, g);
+    svg("text", Object.assign({ class: "c-num", text: k + 1 }, mid), g);
+    const c = svg("g", { class: "fb" }, g);
+    svg("rect", { class: "c-red", x: cx, y, width: cw, height: 46, rx: 10 }, c);
+    svg("text", Object.assign({ class: "c-numw", text: k + 1 }, mid), c);
+    on.push(c);
+  }
+  return { g, on };
+}
+const resultsRow = row(776, 536, 447, 3);
+const resultsTag = svg("text", { class: "rlab", x: 776, y: 522, text: "results" }, art);
+const cmpRows = [row(48, 400, 539, 5), row(678, 400, 554, 5)];
+const cmpTags = [svg("text", { class: "rlab", x: 48, y: 386, text: "results" }, art), svg("text", { class: "rlab", x: 678, y: 386, text: "results" }, art)];
+
+const lab = $("lab"), cmpL = $("cmpL"), cmpR = $("cmpR"), eq = $("eq"), cap4 = $("cap4");
+const LABELS = ["<em>the loop</em> you know", "<em>four workers</em> start", "<em>map</em> hands each free worker the next task", "<em>results</em> come back in the same order as the loop"];
+const set = (el, v, tf = "") => { el.style.opacity = v; el.style.transform = tf; };
+
+function drawFinish(n) {                                  // the loop's finish line, and the Pool's, once there is one
+  view.clearFinish();
+  view.finish(TOTAL, "", { side: "end" });
+  if (n >= 2) view.finish(T_POOL, "", { side: "start" });
+}
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "On the left, code up to the loop line results = [run(t) for t in tasks] is highlighted; on the right, one lane holds the 12 numbered tasks in a row, labeled the loop you know.",
+    "The line with Pool(4) as pool appears and is highlighted, and three more lanes appear, labeled four workers start.",
+    "The line results = pool.map(run, tasks) is highlighted and each worker takes the next task as soon as it is free, so the lanes fill unevenly but stay busy and a new finish line lands far to the left of the loop's, labeled map hands each free worker the next task.",
+    "A results row under the lanes fills in list order, 1 to 12, as the blocks finish out of order in time, labeled results come back in the same order as the loop.",
+    "The loop line and the two Pool lines sit side by side, each with the same row of results 1 to 12, under the caption: Two lines changed. Same answers.",
+  ],
+
+  setup(c) { ctx = c; },
+
+  render(n) {
+    const pic = n <= 3;
+    set(code, pic ? 1 : 0);
+    lines.forEach(l => set(l.el, pic && n >= l.from ? 1 : 0));
+    set(hlA, n === 0 ? 1 : 0);
+    set(hlB, n >= 1 && n <= 3 ? 1 : 0, n >= 2 ? "translateY(38px)" : "");
+
+    view.root.style.opacity = pic ? 1 : 0;
+    view.showLanes(n >= 1 ? 4 : 1);
+    view.set(n >= 2 ? pool : loop);
+    view.seek(1);
+    drawFinish(n);
+    lab.innerHTML = LABELS[n] || "";
+    set(lab, pic ? 1 : 0);
+
+    set(resultsRow.g, n === 3 ? 1 : 0); set(resultsTag, n === 3 ? 1 : 0);
+    resultsRow.on.forEach(c => set(c, n === 3 ? 1 : 0));
+    cmpRows.forEach(r => { set(r.g, n === 4 ? 1 : 0); r.on.forEach(c => set(c, 1)); });
+    cmpTags.forEach(t => set(t, n === 4 ? 1 : 0));
+    for (const el of [cmpL, cmpR, eq, cap4]) set(el, n === 4 ? 1 : 0);
+  },
+
+  enter(n, { animate, later }) {
+    const fade = (el, a, b, delay = 0, dur = 400) => animate(el, [{ opacity: a }, { opacity: b }], { delay, duration: dur });
+    const rise = (el, delay, dy = 14, dur = 500) => animate(el, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "translateY(0px)" }], { delay, duration: dur });
+    const swapLabel = () => { fade(lab, 1, 0, 0, 250); later(250, () => { lab.innerHTML = LABELS[n]; }); fade(lab, 0, 1, 250, 350); };
+
+    if (n === 1) {
+      fade(hlA, 1, 0, 0, 300);
+      fade(lines[4].el, 0, 1, 250, 450);
+      fade(hlB, 0, 1, 500, 400);
+      swapLabel();
+      view.showLanes(4, { animate: true, duration: 700, delay: 300 });
+    }
+
+    if (n === 2) {
+      fade(lines[5].el, 0, 1, 100, 450);
+      animate(hlB, [{ transform: "translateY(0px)" }, { transform: "translateY(38px)" }], { delay: 100, duration: 500, easing: EASE.inOut });
+      swapLabel();
+      // the loop's tasks leave lane 1; the same 12 tasks fill four lanes in the order the workers free up
+      view.set(pool, { animate: true, fill: true, duration: 300 });
+      view.fill({ duration: REPLAY, delay: 450 });
+      view.finish(T_POOL, "", { side: "start", animate: true, delay: 450 + at_ms(T_POOL) + 100 });
+    }
+
+    if (n === 3) {
+      swapLabel();
+      fade(resultsRow.g, 0, 1, 0, 400); fade(resultsTag, 0, 1, 0, 400);
+      view.seek(0);                                       // the blocks run again, and each result drops into its own place in the list
+      view.fill({ duration: REPLAY, delay: 450 });
+      pool.forEach((t, k) => animate(resultsRow.on[k], [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "scale(1)" }], { delay: 450 + at_ms(t.end), duration: 350, easing: EASE.pop }));
+    }
+
+    if (n === 4) {
+      for (const el of [code, lab, view.root, resultsRow.g, resultsTag]) fade(el, 1, 0, 0, 500);
+      rise(cmpL, 550, 16, 600); rise(cmpR, 700, 16, 600); rise(eq, 1000, 0, 500);
+      cmpRows.forEach((r, i) => { fade(r.g, 0, 1, 1200 + i * 150, 500); fade(cmpTags[i], 0, 1, 1200 + i * 150, 500); });
+      rise(cap4, 1900, 14, 600);
+    }
+  },
+});
+</script>
+</body>
+</html>

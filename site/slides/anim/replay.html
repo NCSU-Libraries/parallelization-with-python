@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1 worker vs. 14 workers</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A10: the same 1,008 forest runs, replayed from real timings in the lanes: 1 worker above, 14 workers below.
+     The data is data/trace-w1.json and data/trace-w14.json (every task's start and end, in seconds) and data/scaling.json. */
+  .t { position: absolute; margin: 0; opacity: 0; white-space: nowrap; }
+  .pn    { left: 52px; font: 800 30px/1.2 var(--font); color: var(--ink); }
+  .clock { left: 52px; font: 800 40px/1.1 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tag   { left: 52px; font: 600 24px/1.2 var(--font); color: var(--muted); }
+  #pn1 { top: 128px; } #clock1 { top: 162px; }
+  #unzoomTag { top: 208px; } #pn14 { top: 262px; } #clock14 { top: 298px; } #zoomTag { top: 350px; }
+
+  /* blocks narrower than a pixel meet at fractions of a pixel, which striped the bar: snap them (the zoomed blocks are not snapped) */
+  .flat .blk { shape-rendering: crispEdges; }
+
+  /* the words that carry each beat, at the bottom: one bold line, or two or three */
+  .cap { position: absolute; left: 52px; right: 48px; bottom: 52px; margin: 0; opacity: 0; }
+  .cap b { display: block; font: 800 30px/1.2 var(--font); color: var(--ink); }
+  .cap span { display: block; margin-top: 4px; font: 600 27px/1.2 var(--font); color: var(--muted); }
+  .cap em { font-style: normal; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">1 worker vs. 14 workers</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <p class="t pn" id="pn1" aria-hidden="true">1 worker</p>
+  <p class="t clock" id="clock1" aria-hidden="true">0.0 s</p>
+  <p class="t pn" id="pn14" aria-hidden="true">14 workers</p>
+  <p class="t clock" id="clock14" aria-hidden="true">0.0 s</p>
+  <p class="t tag" id="unzoomTag" aria-hidden="true">not zoomed</p>
+  <p class="t tag" id="zoomTag" aria-hidden="true"></p>
+
+  <p class="cap" id="cap0" aria-hidden="true"></p>
+  <p class="cap" id="cap1" aria-hidden="true"></p>
+  <p class="cap" id="cap2" aria-hidden="true"></p>
+  <p class="cap" id="cap3" aria-hidden="true"></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script src="_shared/lanes.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+
+// ---- the scene (stage pixels) -----------------------------------------------------------------------------------------------
+const X0 = 250, W = 960;                        // where time 0 sits, and the width of the time axis
+const FULL = 40, ZOOMED = 4;                    // the time axis in seconds: 0-40 s, then the bottom panel zooms to 0-4 s
+const REPLAY_MS = 6600;                         // the single worker's whole run, as animation time: about 7 s
+const TOP = { y: 152, laneH: 44 };
+const BOT = { y: 276, laneH: 12, gap: 3, n: 14 };
+const AXIS_Y = BOT.y + (BOT.n - 1) * (BOT.laneH + BOT.gap) + BOT.laneH + 14;      // the bottom panel's finish lines end here
+const art = document.getElementById("art");
+const $ = id => document.getElementById(id);
+const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+const fmtS = s => s.toFixed(1) + " s";
+const fmt = n => n.toLocaleString("en-US");
+
+// The bottom panel zooms, so its time scale is an object whose px-per-second can change (lanes.js reads x() and w() on every
+// set(), so a set() with animate: true glides and stretches every block into the new scale).
+const zoom = { k: W / FULL };
+const botScale = { domain: [0, FULL], range: [X0, X0 + W], x: t => X0 + t * zoom.k, w: dt => dt * zoom.k, t: x => (x - X0) / zoom.k };
+
+let vTop, vBot, ctx, D, axes, ghost, caps, DEF;
+
+// the axis under the bottom panel: one line, and two sets of ticks that trade places at the zoom
+function buildAxis() {
+  const g = svg("g", { class: "lanes" }, art);
+  svg("line", { class: "axis-line", x1: X0 - 6, x2: X0 + W + 6, y1: AXIS_Y, y2: AXIS_Y }, g);
+  svg("text", { class: "axis-title", x: X0 - 22, y: AXIS_Y, dy: "0.35em", "text-anchor": "end", text: "seconds →" }, g);
+  const ticks = (list, k) => {
+    const t = svg("g", {}, g);
+    for (const v of list) {
+      svg("line", { class: "tick", x1: X0 + v * k, x2: X0 + v * k, y1: AXIS_Y, y2: AXIS_Y + 12 }, t);
+      svg("text", { class: "tick-label", x: X0 + v * k, y: AXIS_Y + 40, "text-anchor": "middle", text: String(v) }, t);
+    }
+    return t;
+  };
+  return { full: ticks([0, 10, 20, 30, 40], W / FULL), zoomed: ticks([0, 1, 2, 3, 4], W / ZOOMED) };
+}
+
+function setup(c, [t1, t14, scaling]) {
+  ctx = c;
+  const pool14 = scaling.pool.find(p => p.workers === 14);
+  const tasks = (tr, tag) => tr.tasks.map(t => ({ id: tag + t.i, worker: t.worker, start: t.start, end: t.end, kind: "task" }));
+  D = {
+    n: t1.tasks.length, w1: t1.wall, w14: t14.wall,
+    items1: tasks(t1, "a"), items14: tasks(t14, "b"),
+    factor: Math.round(pool14.speedup_total),                    // "about 10 times": the serial time over the 14-worker time, in scaling.json
+    ideal: t1.wall / 14,                                         // where a perfect 14 times faster would have finished
+    rate: REPLAY_MS / t1.wall,                                   // animation ms per second of real time, the same in both panels
+  };
+  D.replayX = Math.round(t1.wall / (REPLAY_MS / 1000));          // "about 5 times faster than real time"
+  D.zoomX = FULL / ZOOMED;
+
+  axes = buildAxis();
+  vTop = Lanes.create({
+    parent: art, x: X0, y: TOP.y, width: W, domain: [0, FULL], lanes: 1, laneH: TOP.laneH, gap: 0, inset: 6, blockGap: -1,   // each block overlaps its neighbour by a pixel: no seams
+    finLead: 24, labelLift: 10, labels: () => null, axis: false, animate: (...a) => ctx.animate(...a),
+  });
+  vBot = Lanes.create({
+    parent: art, x: X0, y: BOT.y, scale: botScale, lanes: BOT.n, laneH: BOT.laneH, gap: BOT.gap, inset: 2, blockGap: 1.5,
+    finLead: 24, labelLift: 10, labels: () => null, axis: false, animate: (...a) => ctx.animate(...a),
+  });
+
+  vTop.root.classList.add("flat");
+
+  // the dotted line for a perfect 14 times faster, which the real finish line misses (beat 3)
+  ghost = svg("g", { class: "lanes" }, art);
+  const gx = X0 + D.ideal * (W / ZOOMED), gy = BOT.y - 24;
+  svg("line", { class: "finish-ghost", x1: gx, x2: gx, y1: gy, y2: AXIS_Y, style: { strokeDasharray: "10 9", strokeWidth: 4, opacity: 0.6 } }, ghost);
+  svg("text", { class: "finish-label ghost", x: gx - 16, y: gy - 10, "text-anchor": "end", text: `14× faster would be ${fmtS(D.ideal)}` }, ghost);
+  ghost.style.opacity = 0;
+  $("zoomTag").textContent = `zoomed in ${D.zoomX}×`;
+
+  caps = [0, 1, 2, 3].map(i => $("cap" + i));
+  caps[0].innerHTML = `<b>The same ${fmt(D.n)} forest runs, once on 1 worker and once on 14.</b>`;
+  caps[1].innerHTML = `<b>Real timings from this laptop, replayed about ${D.replayX}× faster than real time.</b>`;
+  caps[2].innerHTML = "<b>Each block is one forest.</b><b>A worker takes the next task as soon as it’s free.</b><span>Sparse forests are quick, dense ones slow.</span>";
+  caps[3].innerHTML = `<b>About ${D.factor} times faster on 14 cores, not 14.</b><b>Why? <em>Next.</em></b>`;
+
+  DEF.alt = [
+    `Two panels share a time axis from 0 to ${FULL} seconds, a top panel with one lane for 1 worker and a bottom panel with 14 thin lanes for 14 workers, and both clocks read 0.0 seconds.`,
+    `Both panels replay the same ${fmt(D.n)} forest runs from real timings: the 14 workers finish at ${fmtS(D.w14)}, where a finish line drops, while the single worker keeps going until ${fmtS(D.w1)}.`,
+    `The bottom panel zooms to 0 to ${ZOOMED} seconds so the real blocks show: each block is one forest, short for sparse forests and long for dense ones, and a worker takes the next task as soon as it is free.`,
+    `A dotted line marks where a perfect 14 times faster would have finished, at ${fmtS(D.ideal)}, short of the real ${fmtS(D.w14)}, and the label says about ${D.factor} times faster on 14 cores, not 14, with the reason coming next.`,
+  ];
+}
+
+DEF = {
+  beats: 3,
+  alt: [],
+  load: () => Promise.all([Anim.loadJSON("data/trace-w1.json"), Anim.loadJSON("data/trace-w14.json"), Anim.loadJSON("data/scaling.json")]),
+  setup,
+
+  render(n) {
+    zoom.k = W / (n >= 2 ? ZOOMED : FULL);
+    vBot.root.classList.toggle("flat", n <= 1);
+    vTop.set(n >= 1 ? D.items1 : []);
+    vBot.set(n >= 1 ? D.items14 : []);
+    vTop.clearFinish();
+    vBot.clearFinish();
+    if (n >= 1) {
+      vTop.finish(D.w1, fmtS(D.w1), { side: "end" });
+      vBot.finish(D.w14, fmtS(D.w14), { side: n >= 2 ? "end" : "start" });
+    }
+    op(axes.full, n <= 1 ? 1 : 0);
+    op(axes.zoomed, n >= 2 ? 1 : 0);
+    for (const id of ["pn1", "pn14", "clock1", "clock14"]) op($(id), 1);
+    $("clock1").textContent = n >= 1 ? fmtS(D.w1) : "0.0 s";
+    $("clock14").textContent = n >= 1 ? fmtS(D.w14) : "0.0 s";
+    op($("zoomTag"), n >= 2 ? 1 : 0);
+    op($("unzoomTag"), n >= 2 ? 1 : 0);
+    op(ghost, n === 3 ? 1 : 0);
+    caps.forEach((c, i) => op(c, i === n ? 1 : 0));
+  },
+
+  enter(n, { animate, later }) {
+    const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+    const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+    const words = () => { animate(caps[n - 1], fade(1, 0), { duration: 350 }); animate(caps[n], rise(10), { duration: 550, delay: 250 }); };
+    // a clock that counts real seconds while the replay runs, and stops at its panel's wall time
+    const clock = (el, wall, lead) => {
+      const end = wall * D.rate;
+      for (let ms = 100; ms < end; ms += 100) later(lead + ms, () => { el.textContent = fmtS(ms / D.rate); });
+      later(lead + end, () => { el.textContent = fmtS(wall); });
+    };
+
+    if (n === 1) {
+      // both panels replay at the same speed: the 14 workers are done long before the single worker is
+      const lead = 250, dom = FULL * D.rate;
+      vTop.set(D.items1, { fill: true });
+      vBot.set(D.items14, { fill: true });
+      vTop.fill({ duration: dom, delay: lead });
+      vBot.fill({ duration: dom, delay: lead });
+      clock($("clock1"), D.w1, lead);
+      clock($("clock14"), D.w14, lead);
+      vTop.finish(D.w1, fmtS(D.w1), { side: "end", animate: true, delay: lead + D.w1 * D.rate + 60 });
+      vBot.finish(D.w14, fmtS(D.w14), { side: "start", animate: true, delay: lead + D.w14 * D.rate + 60 });
+      words();
+    }
+
+    if (n === 2) {
+      // the bottom panel zooms: every block glides to its place on the new scale and stretches to its real length
+      const was = zoom.k, move = 1000;
+      vBot.root.classList.remove("flat");
+      zoom.k = W / ZOOMED;
+      vBot.clearFinish();
+      vBot.set(D.items14, { animate: true, duration: move, ease: EASE.inOut });
+      const rec = vBot.finish(D.w14, fmtS(D.w14), { side: "end" });
+      animate(rec.g, [{ transform: `translate(${X0 + D.w14 * was}px, 0px)` }, { transform: `translate(${X0 + D.w14 * zoom.k}px, 0px)` }], { duration: move, easing: EASE.inOut });
+      animate(rec.lab, [{ opacity: 0 }, { opacity: 0, offset: 0.7 }, { opacity: 1 }], { duration: move + 300 });
+      animate(axes.full, fade(1, 0), { duration: 450 });
+      animate(axes.zoomed, fade(0, 1), { duration: 600, delay: 500 });
+      animate($("zoomTag"), rise(8), { duration: 500, delay: 700 });
+      animate($("unzoomTag"), rise(8), { duration: 500, delay: 700 });
+      words();
+    }
+
+    if (n === 3) {
+      animate(ghost, rise(-14), { duration: 700, delay: 300 });
+      words();
+    }
+  },
+};
+defineAnimation(DEF);
+</script>
+</body>
+</html>

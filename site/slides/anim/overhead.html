@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When parallel is slower</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A12: when parallel is slower. Tiny forests (4 x 4) take about 10 microseconds each, so handing them out one at a time
+     costs more than doing them. The lanes replay data/trace-tiny-c1.json (one task per parcel) and data/trace-tiny-chunked.json
+     (bundled parcels); the scoreboard is data/scaling.json > tiny (all 100,000 runs). */
+  .f-ground { fill: var(--ground); }
+  .f-tree   { fill: var(--tree); }
+  .f-frame  { fill: none; stroke: var(--line); stroke-width: 4; }
+  .forest path, .forest rect { shape-rendering: crispEdges; }
+
+  .t { position: absolute; margin: 0; opacity: 0; white-space: nowrap; }
+  .fl { width: 420px; text-align: center; font: 600 30px/1.2 var(--font); color: var(--ink); }
+  .fl b { font-weight: 800; }
+  .ft { width: 420px; text-align: center; font: 800 36px/1.2 var(--font); color: var(--red); }
+  .pn { left: 52px; top: 262px; font: 800 30px/1.2 var(--font); color: var(--ink); }
+
+  /* the lanes' header: what red and gray mean, and what the replay is */
+  .legend { position: absolute; left: 52px; top: 98px; display: flex; gap: 40px; align-items: center; font: 600 24px/1 var(--font); color: var(--ink); white-space: nowrap; opacity: 0; }
+  .legend span { display: flex; align-items: center; gap: 12px; }
+  .legend i { display: block; height: 26px; border-radius: 6px; }
+  .legend b { font-weight: 600; }
+  .sw-run { width: 10px; background: var(--red); }
+  .sw-run.parcel { width: 44px; }
+  .sw-wait { width: 44px; background: var(--overhead); }
+  #note { right: 48px; top: 100px; text-align: right; font: 600 24px/1.2 var(--font); color: var(--muted); }
+
+  /* the scoreboard: all 100,000 runs, one bar per way of running them */
+  #scHead { left: 52px; top: 458px; font: 600 24px/1.2 var(--font); color: var(--muted); }
+  .row { position: absolute; left: 52px; right: 48px; height: 36px; display: flex; align-items: center; opacity: 0; }
+  .row .l { flex: none; width: 390px; font: 600 24px/1 var(--font); color: var(--ink); white-space: nowrap; }
+  .row .bar { flex: none; height: 28px; border-radius: 8px; transform-origin: left center; }
+  .row .bar.loop { background: var(--muted); }
+  .row .bar.pool { background: var(--red); }
+  .row .v { flex: none; margin-left: 14px; font: 800 28px/1 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row .pill { flex: none; margin-left: 14px; padding: 5px 14px 6px; border-radius: 20px; font: 800 26px/1 var(--font); color: var(--paper); white-space: nowrap; }
+  .pill.slower { background: var(--red); }
+  .pill.faster { background: var(--ink); }
+
+  /* the rule-of-thumb card (beat 3) */
+  .rules { position: absolute; left: 52px; top: 112px; width: 1176px; padding: 24px 40px 28px; background: var(--paper); border: 4px solid var(--line); border-radius: 26px; opacity: 0; }
+  .rules p { position: relative; margin: 0; padding-left: 40px; color: var(--ink); opacity: 0; }
+  .rules p::before { content: ""; position: absolute; left: 0; top: 0.42em; width: 18px; height: 18px; border-radius: 6px; background: var(--red); }
+  .rules p.r1 { font: 800 40px/1.2 var(--font); }
+  .rules p.r2 { margin-top: 20px; font: 600 30px/1.3 var(--font); }
+  .rules p.r3 { margin-top: 12px; font: 600 30px/1.3 var(--font); }
+  .rules code { font: 500 0.9em var(--mono); padding: 1px 6px; border-radius: 8px; background: var(--idle); }
+  .rules p.r1::before { top: 0.5em; }
+
+  /* the words that carry each beat, at the bottom */
+  .cap { position: absolute; left: 52px; right: 48px; bottom: 52px; margin: 0; opacity: 0; }
+  .cap b { display: block; font: 800 30px/1.2 var(--font); color: var(--ink); }
+  .cap span { display: block; margin-top: 4px; font: 600 27px/1.2 var(--font); color: var(--muted); }
+  .cap em { font-style: normal; color: var(--red); }
+  .cap code { font: 600 0.9em var(--mono); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">When parallel is slower</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <p class="t fl" id="fl0" aria-hidden="true"></p>
+  <p class="t ft" id="ft0" aria-hidden="true"></p>
+  <p class="t fl" id="fl1" aria-hidden="true"></p>
+  <p class="t ft" id="ft1" aria-hidden="true"></p>
+
+  <div class="legend" id="legend" aria-hidden="true"><span id="lgRunItem"><i class="sw-run" id="swRun"></i><b id="lgRun">one tiny run</b></span><span><i class="sw-wait"></i><b>waiting for the next parcel</b></span></div>
+  <p class="t" id="note" aria-hidden="true"></p>
+  <p class="t pn" id="pn" aria-hidden="true">14 workers</p>
+
+  <p class="t" id="scHead" aria-hidden="true"></p>
+  <div class="row" id="row0" aria-hidden="true"><span class="l"></span><i class="bar loop"></i><b class="v"></b></div>
+  <div class="row" id="row1" aria-hidden="true"><span class="l"></span><i class="bar pool"></i><b class="v"></b><b class="pill slower"></b></div>
+  <div class="row" id="row2" aria-hidden="true"><span class="l"></span><i class="bar pool"></i><b class="v"></b><b class="pill faster"></b></div>
+
+  <div class="rules" id="rules" aria-hidden="true">
+    <p class="r1">Give each parcel real work:<br>milliseconds, not microseconds.</p>
+    <p class="r2"><code>Pool.map</code> bundles by default.</p>
+    <p class="r3"><code>imap</code> and <code>concurrent.futures</code> send one task per parcel<br>unless you set <code>chunksize</code>.</p>
+  </div>
+
+  <p class="cap" id="cap0" aria-hidden="true"></p>
+  <p class="cap" id="cap1" aria-hidden="true"></p>
+  <p class="cap" id="cap2" aria-hidden="true"></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script src="_shared/lanes.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+
+// ---- the scene (stage pixels) -----------------------------------------------------------------------------------------------
+const X0 = 250, W = 960;                        // where time 0 sits, and the width of the time axis
+const LANES = { y: 196, laneH: 10, gap: 3, n: 14 };
+const REPLAY_MS = 5000;                         // the one-task-per-parcel replay, as animation time (the second replay runs at the same speed)
+const BAR_MAX = 440;                            // px for the longest bar of the scoreboard
+const $ = id => document.getElementById(id);
+const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+const fmt = n => n.toLocaleString("en-US");
+const f2 = v => +v.toFixed(2);
+const art = $("art");
+
+let view, ctx, D, DEF, caps, rows, forests;
+
+// ---- the forests of beat 0 --------------------------------------------------------------------------------------------------
+// the big one is the 60% forest of fire-runs.json (64 cells across), drawn still: trees on bare ground
+function bigForest(parent, run, cell, ox, oy) {
+  const size = fireSize(run), side = size * cell;
+  const g = svg("g", { class: "forest" }, parent);
+  g.style.transform = `translate(${ox}px, ${oy}px)`;
+  svg("rect", { class: "f-ground", width: side, height: side }, g);
+  let d = "";
+  for (let r = 0; r < size; r++) {
+    let c = 0;
+    while (c < size) {
+      if (run.cells[r * size + c] === -2) { c++; continue; }
+      let e = c;
+      while (e + 1 < size && run.cells[r * size + e + 1] !== -2) e++;
+      d += `M${f2(c * cell)} ${f2(r * cell)}h${f2((e - c + 1) * cell)}v${f2(cell)}h${f2(-(e - c + 1) * cell)}z`;
+      c = e + 1;
+    }
+  }
+  svg("path", { class: "f-tree", d }, g);
+  svg("rect", { class: "f-frame", x: -2, y: -2, width: side + 4, height: side + 4 }, g);
+  return g;
+}
+const fireSize = run => Math.round(Math.sqrt(run.cells.length));
+
+// the tiny one: 4 x 4 cells, about 60% of them trees (an illustration: any 4 x 4 forest looks like this)
+function tinyForest(parent, cell, ox, oy) {
+  const pattern = ["TT.T", ".TT.", "T.TT", ".T.T"];
+  const side = 4 * cell;
+  const g = svg("g", { class: "forest" }, parent);
+  g.style.transform = `translate(${ox}px, ${oy}px)`;
+  svg("rect", { class: "f-ground", width: side, height: side }, g);
+  pattern.forEach((row, r) => [...row].forEach((ch, c) => { if (ch === "T") svg("rect", { class: "f-tree", x: c * cell, y: r * cell, width: cell, height: cell }, g); }));
+  svg("rect", { class: "f-frame", x: -2, y: -2, width: side + 4, height: side + 4 }, g);
+  return g;
+}
+
+// ---- a trace as lane items ---------------------------------------------------------------------------------------------------
+// One red block per task. The gaps between a worker's tasks are the time it spent waiting for its next parcel: one gray span per
+// worker, from its first task to its last, with the tasks drawn on top of it. Times are in milliseconds.
+function itemsOf(trace, tag) {
+  const byWorker = new Map();
+  for (const t of trace.tasks) { if (!byWorker.has(t.worker)) byWorker.set(t.worker, []); byWorker.get(t.worker).push(t); }
+  const gaps = [], runs = [];
+  for (const [w, list] of byWorker) {
+    let s = Infinity, e = -Infinity;
+    for (const t of list) { s = Math.min(s, t.start); e = Math.max(e, t.end); runs.push({ id: tag + t.i, worker: w, start: t.start * 1000, end: t.end * 1000, kind: "task" }); }
+    gaps.push({ id: tag + "g" + w, worker: w, start: s * 1000, end: e * 1000, kind: "overhead" });
+  }
+  return gaps.concat(runs);                     // the gray first, so the red sits on top
+}
+
+const ms1 = s => (s * 1000).toFixed(1) + " ms";
+
+function setup(c, [scaling, c1, ch, sweep, fireRuns]) {
+  ctx = c;
+  const tiny = scaling.tiny;
+  const sixty = fireRuns.runs.reduce((a, r) => (Math.abs(r.density - 0.6) < Math.abs(a.density - 0.6) ? r : a));
+  const secs60 = sweep.results.filter(r => Math.abs(r[0] - 0.6) < 1e-9).map(r => r[3]).sort((x, y) => x - y);
+  const med = (secs60[(secs60.length - 1) >> 1] + secs60[secs60.length >> 1]) / 2;
+  const total = o => o.total.seconds;
+  D = {
+    n: tiny.n_tasks, size: tiny.size, real: sweep.size,
+    bigMs: 10 * Math.round(med * 1000 / 10),                                  // about 40 ms: a real 450 x 450 run
+    us: Math.round(tiny.serial.seconds / tiny.n_tasks * 1e6),                 // about 10 us: a 4 x 4 run, from the serial time
+    t0: tiny.serial.seconds, t1: total(tiny.chunksize_1), t2: total(tiny.chunksize_default), chunk: tiny.default_chunksize,
+    c1, ch, n1: itemsOf(c1, "p"), n2: itemsOf(ch, "q"),
+    dom: Math.ceil(Math.max(c1.wall, ch.wall) * 1000 / 10) * 10,              // 50 ms: the lanes' time axis
+  };
+  D.cells = Math.round(D.real * D.real / (D.size * D.size) / 1000) * 1000;           // about 13,000 times as many cells
+  D.slower = D.t1 / D.t0;                                                     // 1.65 times slower
+  D.faster = D.t0 / D.t2;                                                     // 6.5 times faster
+  D.rate = REPLAY_MS / (c1.wall * 1000);                                      // animation ms per real ms, the same in both replays
+
+  // beat 0
+  forests = [
+    bigForest(art, sixty, 4.5, 256, 180),
+    tinyForest(art, 28, 824, 180 + 288 - 112),
+  ];
+  const lab = (id, html, x, y) => { const e = $(id); e.innerHTML = html; e.style.left = x + "px"; e.style.top = y + "px"; return e; };
+  lab("fl0", `<b>${D.real} × ${D.real}</b> forest`, 400 - 210, 484);
+  lab("ft0", `about ${D.bigMs} ms per run`, 400 - 210, 526);
+  lab("fl1", `<b>${D.size} × ${D.size}</b> forest`, 880 - 210, 484);
+  lab("ft1", `about ${D.us} µs per run`, 880 - 210, 526);
+
+  // beats 1 and 2: 14 thin lanes, the same time axis for both replays
+  view = Lanes.create({
+    parent: art, x: X0, y: LANES.y, width: W, domain: [0, D.dom], lanes: LANES.n, laneH: LANES.laneH, gap: LANES.gap, inset: 1.5,
+    blockGap: 0, overheadGap: 0, finLead: 24, labelLift: 10, ghostDrop: 34, labels: () => null,
+    axis: { ticks: Array.from({ length: D.dom / 10 + 1 }, (_, i) => i * 10), title: "time (ms) →" }, animate: (...a) => ctx.animate(...a),
+  });
+  view.root.style.opacity = 0;
+
+  // the scoreboard: all 100,000 runs
+  const tmax = Math.max(D.t0, D.t1, D.t2);
+  rows = [
+    { el: $("row0"), name: "plain loop", t: D.t0, pill: null },
+    { el: $("row1"), name: "Pool, one task per parcel", t: D.t1, pill: `${D.slower.toFixed(2)}× slower` },
+    { el: $("row2"), name: `Pool, ${fmt(D.chunk)} tasks per parcel`, t: D.t2, pill: `${D.faster.toFixed(1)}× faster` },
+  ];
+  rows.forEach((r, i) => {
+    r.el.style.top = (490 + i * 36) + "px";
+    r.el.querySelector(".l").textContent = r.name;
+    r.bar = r.el.querySelector(".bar");
+    r.bar.style.width = f2(BAR_MAX * r.t / tmax) + "px";
+    r.el.querySelector(".v").textContent = r.t.toFixed(2) + " s";
+    if (r.pill) r.el.querySelector(".pill").textContent = r.pill;
+  });
+  $("scHead").textContent = `All ${fmt(D.n)} tiny runs, total time`;
+
+  // the words
+  caps = [0, 1, 2].map(i => $("cap" + i));
+  caps[0].innerHTML = `<b>Same code, tiny forests: each run takes about ${D.us} µs.</b><span>Not to scale: the big forest has about ${fmt(D.cells)} times as many cells.</span>`;
+  caps[1].innerHTML = "<b>Like hiring movers to carry <em>one spoon at a time</em>.</b>";
+  caps[2].innerHTML = "<b><code>chunksize</code> bundles tasks into bigger parcels.</b>";
+
+  DEF.alt = [
+    `A tiny ${D.size} by ${D.size} forest stands next to a big ${D.real} by ${D.real} one: the big run takes about ${D.bigMs} milliseconds, the tiny one about ${D.us} microseconds, with the same code.`,
+    `${fmt(c1.tasks.length)} tiny runs replay on 14 lanes with one task per parcel as thin red slivers between long gray gaps of waiting for the next parcel, and a scoreboard shows the plain loop at ${D.t0.toFixed(2)} seconds against the pool at ${D.t1.toFixed(2)} seconds, ${D.slower.toFixed(2)} times slower, like hiring movers to carry one spoon at a time.`,
+    `With chunks of ${ch.chunksize} tasks per parcel the lanes fill with solid red blocks and finish at ${ms1(ch.wall)} instead of ${ms1(c1.wall)}; the scoreboard adds the pool with ${fmt(D.chunk)} tasks per parcel at ${D.t2.toFixed(2)} seconds, ${D.faster.toFixed(1)} times faster: chunksize bundles tasks into bigger parcels.`,
+    "A rule-of-thumb card: give each parcel real work, milliseconds not microseconds; Pool.map bundles by default; imap and concurrent.futures send one task per parcel unless you set chunksize.",
+  ];
+  D.noteText = [null, `${fmt(c1.tasks.length)} runs, replayed in slow motion`, `${fmt(ch.tasks.length)} runs, replayed in slow motion`];
+  D.legendRun = [null, "one tiny run", `a parcel of ${ch.chunksize} tiny runs`];
+}
+
+// what the scoreboard shows at each beat
+const SHOWN = [0, 2, 3, 3];                                          // rows visible at beats 0..3
+
+DEF = {
+  beats: 3,
+  alt: [],
+  load: () => Promise.all([Anim.loadJSON("data/scaling.json"), Anim.loadJSON("data/trace-tiny-c1.json"), Anim.loadJSON("data/trace-tiny-chunked.json"), Anim.loadJSON("data/sweep.json"), Anim.loadJSON("data/fire-runs.json")]),
+  setup,
+
+  render(n) {
+    // beat 0
+    forests.forEach(g => { g.style.opacity = n === 0 ? 1 : 0; });          // not op(): the forests keep their translate
+    for (const id of ["fl0", "ft0", "fl1", "ft1"]) op($(id), n === 0 ? 1 : 0);
+    // the lanes
+    const lanes = n === 1 || n === 2;
+    op(view.root, lanes ? 1 : 0);
+    view.set(n === 1 ? D.n1 : n === 2 ? D.n2 : []);
+    view.clearFinish();
+    if (lanes) view.finish(D.c1.wall * 1000, ms1(D.c1.wall), { side: "end", ghostLabel: ms1(D.c1.wall) });
+    if (n === 2) view.finish(D.ch.wall * 1000, ms1(D.ch.wall), { side: "start" });     // the one-task-per-parcel line becomes a ghost
+    op($("legend"), lanes ? 1 : 0);
+    $("lgRun").textContent = D.legendRun[n === 2 ? 2 : 1];
+    $("swRun").classList.toggle("parcel", n === 2);
+    op($("pn"), lanes ? 1 : 0);
+    const note = $("note");
+    note.textContent = D.noteText[n] || "";
+    op(note, lanes ? 1 : 0);
+    // the scoreboard
+    op($("scHead"), n >= 1 ? 1 : 0);
+    rows.forEach((r, i) => {
+      op(r.el, i < SHOWN[n] ? 1 : 0);
+      op(r.bar, 1);
+    });
+    op($("rules"), n === 3 ? 1 : 0);
+    $("rules").querySelectorAll("p").forEach(p => op(p, 1));
+    caps.forEach((c, i) => op(c, i === n ? 1 : 0));
+  },
+
+  enter(n, { animate, later }) {
+    const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+    const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+    const grow = [{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }];
+    // a scoreboard row: it rises in, and its bar grows from the left; the verdict pops in last
+    const showRow = (i, at) => {
+      const r = rows[i];
+      animate(r.el, rise(8), { duration: 450, delay: at });
+      animate(r.bar, grow, { duration: 800, delay: at + 150, easing: EASE.inOut });
+      const extra = [...r.el.querySelectorAll(".v, .pill")];
+      extra.forEach((e, k) => animate(e, fade(0, 1), { duration: 400, delay: at + 700 + k * 250 }));
+    };
+
+    if (n === 1) {
+      for (const id of ["fl0", "ft0", "fl1", "ft1"]) animate($(id), fade(1, 0), { duration: 400 });
+      forests.forEach(g => animate(g, fade(1, 0), { duration: 450 }));
+      animate(caps[0], fade(1, 0), { duration: 350 });
+      for (const id of ["legend", "pn", "note"]) animate($(id), fade(0, 1), { duration: 500, delay: 400 });
+      $("note").textContent = D.noteText[1];
+      animate(view.root, fade(0, 1), { duration: 500, delay: 300 });
+      // the replay: red slivers, with the gray of the waiting between them
+      const lead = 900, dom = D.dom * D.rate;
+      view.set(D.n1, { fill: true });
+      view.fill({ duration: dom, delay: lead });
+      view.finish(D.c1.wall * 1000, ms1(D.c1.wall), { side: "end", ghostLabel: ms1(D.c1.wall), animate: true, delay: lead + D.c1.wall * 1000 * D.rate + 60 });
+      // the scoreboard while the replay runs out: the plain loop, then the pool, one task per parcel
+      animate($("scHead"), fade(0, 1), { duration: 500, delay: lead + 2200 });
+      showRow(0, lead + 2600);
+      showRow(1, lead + 3500);
+      animate(caps[1], rise(10), { duration: 550, delay: lead + 4800 });
+    }
+
+    if (n === 2) {
+      animate(caps[1], fade(1, 0), { duration: 350 });
+      $("lgRun").textContent = D.legendRun[2];
+      $("swRun").classList.add("parcel");
+      animate($("lgRunItem"), fade(0, 1), { duration: 500, delay: 200 });
+      $("note").textContent = D.noteText[2];
+      // the second replay, at the same speed: the old blocks fade out, the new ones fill in
+      const lead = 600;
+      view.set(D.n2, { animate: true, fill: true });
+      view.fill({ duration: D.dom * D.rate, delay: lead });
+      view.finish(D.ch.wall * 1000, ms1(D.ch.wall), { side: "start", animate: true, delay: lead + D.ch.wall * 1000 * D.rate + 60 });
+      showRow(2, lead + D.ch.wall * 1000 * D.rate + 700);
+      animate(caps[2], rise(10), { duration: 550, delay: lead + D.ch.wall * 1000 * D.rate + 300 });
+    }
+
+    if (n === 3) {
+      animate(view.root, fade(1, 0), { duration: 450 });
+      for (const id of ["legend", "pn", "note"]) animate($(id), fade(1, 0), { duration: 400 });
+      animate(caps[2], fade(1, 0), { duration: 350 });
+      animate($("rules"), rise(14), { duration: 600, delay: 300 });
+      $("rules").querySelectorAll("p").forEach((p, i) => animate(p, rise(10), { duration: 500, delay: 700 + i * 600 }));
+    }
+  },
+};
+defineAnimation(DEF);
+</script>
+</body>
+</html>

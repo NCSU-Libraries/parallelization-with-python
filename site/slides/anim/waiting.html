@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waiting vs. computing</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A4: waiting vs. computing. Downloads mostly wait (on the network); forests mostly compute. Hatched gray is the one new mark. */
+  .hatch-bg { fill: var(--paper); }
+  .hatch-ln { stroke: var(--overhead); stroke-width: 4; }
+  .wait     { fill: url(#hatch); stroke: var(--overhead); stroke-width: 2.5; }
+  .tok-c    { fill: var(--ink); stroke: var(--paper); stroke-width: 4; }
+  .tok-t    { font: 800 22px var(--font); fill: var(--paper); }
+
+  .row-title { position: absolute; left: 48px; margin: 0; font: 800 28px/36px var(--font); color: var(--ink); white-space: nowrap; }
+  .row-title .sub { display: inline-grid; margin-left: 14px; font: 600 26px/36px var(--font); color: var(--muted); }
+  .row-title .sub > span { grid-area: 1 / 1; }
+  .legend { position: absolute; left: 48px; top: 270px; display: flex; align-items: center; gap: 14px; margin: 0; white-space: nowrap; font: 800 26px/32px var(--font); color: var(--ink); }
+  .legend svg { display: block; width: 54px; height: 32px; overflow: visible; }
+  .legend span { font: 600 24px/32px var(--font); color: var(--muted); }
+
+  .note { position: absolute; left: 800px; width: 432px; margin: 0; font: 700 28px/1.22 var(--font); color: var(--ink); opacity: 0; }
+  .note .dim { color: var(--muted); font-weight: 600; }
+  .note .red { color: var(--red); }
+  .foot { position: absolute; left: 800px; top: 548px; width: 432px; margin: 0; font: 400 22px/1.35 var(--font); color: var(--muted); opacity: 0; }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Waiting vs. computing</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true">
+    <defs>
+      <pattern id="hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect class="hatch-bg" width="12" height="12"/>
+        <line class="hatch-ln" x1="6" y1="0" x2="6" y2="12"/>
+      </pattern>
+    </defs>
+  </svg>
+
+  <p class="row-title" style="top:92px" aria-hidden="true">Downloading 4 files<span class="sub"><span>1 worker</span></span></p>
+  <p class="legend" aria-hidden="true"><svg viewBox="0 0 54 32"><rect class="wait" x="2" y="2" width="50" height="28" rx="8"/></svg>waiting<span>for the network or the disk</span></p>
+  <p class="row-title" style="top:316px" aria-hidden="true">Burning 4 forests<span class="sub" id="subs"><span>1 worker</span><span>4 threads</span><span>4 processes</span></span></p>
+
+  <p class="note" id="note1" style="top:140px" aria-hidden="true">One worker can juggle waiting tasks: <b>threads and asyncio</b>. <span class="dim">Not today.</span></p>
+  <p class="note" id="note2" style="top:384px" aria-hidden="true">Threads take turns running Python code, one at a time (the GIL).</p>
+  <p class="note" id="note3" style="top:384px" aria-hidden="true">Separate processes each run their own Python: real parallel computing. <span class="red">That's multiprocessing.</span></p>
+  <p class="foot" id="foot" aria-hidden="true">Python 3.13 and later offer an optional build without the GIL. Standard installs, and Colab, still have it.</p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script src="_shared/lanes.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+const $ = id => document.getElementById(id);
+const art = $("art");
+const tr = (x, y) => `translate(${Math.round(x * 100) / 100}px, ${Math.round(y * 100) / 100}px)`;
+
+// ---- geometry (stage pixels). Both rows use one time scale: 16 units across 700 px. -----------------------------------
+const X0 = 54, WID = 700, U = WID / 16;
+const T = { y: 142, h: 84 };                                  // top row: one tall lane, so that four waits can overlap in it
+const B = { y: 366, h: 52, gap: 8 };                          // bottom row: one lane, then four
+const laneC = w => B.y + w * (B.h + B.gap) + B.h / 2;         // the center line of a bottom lane
+const axisY2 = n => B.y + (n - 1) * (B.h + B.gap) + B.h + 26; // the bottom axis sits under the last shown lane
+
+let ctx;                                                      // set by setup, so the lanes animate through the engine
+const rowView = (y, h, gap, n) => Lanes.create({
+  parent: art, x: X0, y, width: WID, domain: [0, 16], lanes: n, laneH: h, gap, inset: 8, blockGap: 3, finLead: 10,
+  labels: () => null, axis: false, show: 1, animate: (...a) => ctx.animate(...a),
+});
+const vTop = rowView(T.y, T.h, 20, 1);
+const vBot = rowView(B.y, B.h, B.gap, 4);
+
+// the time axes: a line with "time →" under its end (no tick numbers, because these drawings are not measurements)
+function axis(y) {
+  const g = svg("g", { class: "lanes" }, art);
+  g.style.transform = tr(0, y);
+  svg("line", { class: "axis-line", x1: X0 - 6, x2: X0 + WID + 6, y1: 0, y2: 0 }, g);
+  svg("text", { class: "axis-title", x: X0 + WID + 6, y: 28, "text-anchor": "end", text: "time →" }, g);
+  return g;
+}
+axis(T.y + T.h + 26);
+const ax2 = axis(axisY2(1));
+
+// ---- top row: four downloads. Each task is a short red block, then a long hatched wait. ---------------------------------
+// One after another they start 4 units apart. Juggled, they start 1 unit apart: the red blocks still never overlap,
+// the waits do, so each task settles into its own thin row of the one lane.
+const THICK = { y: 22, h: 40, rx: 9 }, THIN = { h: 16, rx: 6 }, stairY = k => 4 + 20 * k;
+const gTasks = svg("g", { class: "lanes" }, art);
+const tasks = [0, 1, 2, 3].map(k => {
+  const g = svg("g", {}, gTasks);
+  return { g, red: svg("rect", { class: "blk", x: 3, width: U - 6 }, g), wait: svg("rect", { class: "wait", x: U + 3, width: 3 * U - 6 }, g) };
+});
+function setTop(n) {
+  tasks.forEach((t, k) => {
+    const juggled = n >= 1;
+    t.g.style.transform = tr(X0 + (juggled ? k : 4 * k) * U, T.y);
+    for (const r of [t.red, t.wait]) {
+      r.setAttribute("y", juggled ? stairY(k) : THICK.y);
+      r.setAttribute("height", juggled ? THIN.h : THICK.h);
+      r.setAttribute("rx", juggled ? THIN.rx : THICK.rx);
+    }
+  });
+}
+
+// ---- bottom row: four forests. One lane; then four threads taking turns; then four processes. -------------------------
+// Sequential: 4 tasks of 4 units each, 16 in all. Threads: each task runs in two turns of 2 units, passed from lane to
+// lane by the GIL token, so the finish stays at 16. Processes: each lane runs one task of 4 units, so the finish is 4.
+const itemsSeq  = [0, 1, 2, 3].map(k => ({ id: "s" + k, worker: 0, start: 4 * k, end: 4 * k + 4, kind: "task" }));
+const itemsThr  = Array.from({ length: 8 }, (_, j) => ({ id: "g" + j, worker: j % 4, start: 2 * j, end: 2 * j + 2, kind: "task" }));
+const itemsProc = [0, 1, 2, 3].map(w => ({ id: "p" + w, worker: w, start: 0, end: 4, kind: "task" }));
+const botItems = n => (n >= 3 ? itemsProc : n === 2 ? itemsThr : itemsSeq);
+
+// the GIL token: one token sits on the lane whose turn it is; with processes each lane has its own
+const gTok = svg("g", {}, art);
+const tok = [0, 1, 2, 3].map(() => {
+  const g = svg("g", {}, gTok), inner = svg("g", { class: "fb" }, g);
+  svg("circle", { class: "tok-c", r: 28 }, inner);
+  svg("text", { class: "tok-t", "text-anchor": "middle", dy: "0.35em", text: "GIL" }, inner);
+  g.style.opacity = 0;
+  return { g, inner };
+});
+const TOKX = 34;                                              // a token sits just inside the start of its block
+const P = Array.from({ length: 8 }, (_, j) => ({ x: X0 + 2 * j * U + TOKX, y: laneC(j % 4) }));   // turn j: lane j mod 4
+const Q = [0, 1, 2, 3].map(w => ({ x: X0 + TOKX, y: laneC(w) }));                                 // processes: each lane's start
+
+const UNIT_MS = 400;                                          // one unit of time on screen, for threads and processes alike
+const ease = u => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+function arcPts(a, b, lift, n = 10) {                          // a hop from a to b that rises `lift` px in the middle
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const e = ease(i / n);
+    return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e - lift * 4 * e * (1 - e) };
+  });
+}
+// the whole trip of the GIL token as one animation: it sits on a turn, then hops to the next lane as that turn ends
+function threadPath(D0, S) {
+  const FL = 400, PRE = 200, total = D0 + 8 * S, kf = [];
+  const at = (t, p) => kf.push({ offset: Math.min(1, t / total), transform: tr(p.x, p.y) });
+  at(0, P[0]);
+  for (let j = 1; j < 8; j++) {
+    const t0 = D0 + S * j - PRE, pts = arcPts(P[j - 1], P[j], 28);
+    pts.forEach((p, i) => at(t0 + FL * i / (pts.length - 1), p));
+  }
+  at(total, P[7]);
+  return { kf, total };
+}
+
+// ---- state --------------------------------------------------------------------------------------------------------------
+const note1 = $("note1"), note2 = $("note2"), note3 = $("note3"), foot = $("foot");
+const subs = [...$("subs").children];
+const vis = (el, on) => { el.style.opacity = on ? 1 : 0; el.style.transform = ""; };
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }];
+const pop = [{ opacity: 0, transform: "scale(0.7)" }, { opacity: 1, transform: "scale(1)" }];
+const subOf = n => (n >= 3 ? 2 : n === 2 ? 1 : 0);
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "Two rows each run on one worker, one task after another: downloading 4 files, where each short red block is followed by a long hatched gray wait for the network or the disk, and burning 4 forests, where each task is solid red.",
+    "In the downloading row one worker juggles all four files, so their waits overlap on the same lane, staggered, and the finish line jumps left; the label says threads and asyncio can do this, but not today.",
+    "In the burning row four threads get four lanes, but a single round token labeled GIL hops between them, only the lane holding it is red at any moment, and the finish line does not move; the label says threads take turns running Python code, one at a time.",
+    "The burning row switches to four processes: each lane gets its own token, all four compute at once, and the finish line moves to a quarter of its old distance; the label says separate processes each run their own Python, which is multiprocessing.",
+    "A muted footnote says Python 3.13 and later offer an optional build without the GIL, but standard installs and Colab still have it.",
+  ],
+
+  setup(c) { ctx = c; },
+
+  render(n) {
+    setTop(n);
+    vTop.clearFinish();
+    vTop.finish(16, "");
+    if (n >= 1) vTop.finish(7, "");                           // the old line stays behind as a ghost
+    vBot.showLanes(n >= 2 ? 4 : 1);
+    vBot.set(botItems(n));
+    vBot.clearFinish();
+    vBot.finish(16, "");
+    if (n >= 3) vBot.finish(4, "");
+    ax2.style.transform = tr(0, axisY2(n >= 2 ? 4 : 1));
+    ax2.style.opacity = 1;
+    tok.forEach((t, w) => {
+      vis(t.g, n === 2 ? w === 0 : n >= 3);
+      t.g.style.transform = n === 2 ? tr(P[7].x, P[7].y) : tr(Q[w].x, Q[w].y);
+      t.inner.style.opacity = 1;
+      t.inner.style.transform = "";
+    });
+    vis(note1, n >= 1);
+    vis(note2, n === 2);
+    vis(note3, n >= 3);
+    vis(foot, n >= 4);
+    subs.forEach((s, i) => vis(s, i === subOf(n)));
+  },
+
+  enter(n, { animate }) {
+    if (n === 1) {                                            // one worker juggles: thin out, then slide the later tasks left
+      tasks.forEach((t, k) => {
+        for (const r of [t.red, t.wait]) {
+          animate(r, [{ y: THICK.y + "px", height: THICK.h + "px", rx: THICK.rx + "px" }, { y: stairY(k) + "px", height: THIN.h + "px", rx: THIN.rx + "px" }], { duration: 600, easing: EASE.inOut });
+        }
+        animate(t.g, [{ transform: tr(X0 + 4 * k * U, T.y) }, { transform: tr(X0 + k * U, T.y) }], { duration: 700, delay: 700 + k * 250, easing: EASE.inOut });
+      });
+      vTop.finish(7, "", { animate: true, delay: 700 + 3 * 250 + 700 + 100 });
+      animate(note1, rise, { duration: 500, delay: 500 });
+    }
+
+    if (n === 2) {                                            // four threads, one GIL token
+      const D0 = 1000, S = 2 * UNIT_MS;                         // a turn of 2 units: the token hops for 400 ms, then rests for 400 ms
+      vBot.showLanes(4, { animate: true, duration: 700 });
+      const a0 = tr(0, axisY2(1)), a1 = tr(0, axisY2(4));
+      ax2.style.transform = a1;                               // the axis leaves, and comes back under the fourth lane
+      animate(ax2, [{ opacity: 1, transform: a0 }, { opacity: 0, transform: a0, offset: 0.12 }, { opacity: 0, transform: a1, offset: 0.7 }, { opacity: 1, transform: a1 }], { duration: 1000, easing: "ease-in-out" });
+      vBot.set(itemsThr, { animate: true, fill: true });      // the single lane's four tasks fade out; the turns are added empty
+      vBot.fill({ duration: 16 * UNIT_MS, delay: D0 });       // and are painted turn by turn
+      const { kf, total } = threadPath(D0, S);
+      tok[0].g.style.opacity = 1;
+      animate(tok[0].inner, pop, { duration: 400, delay: D0 - 500, easing: EASE.pop });
+      animate(tok[0].g, kf, { duration: total, easing: "linear" });
+      animate(note2, rise, { duration: 500, delay: 400 });
+      animate(subs[0], fade(1, 0), { duration: 400 });
+      animate(subs[1], fade(0, 1), { duration: 400, delay: 300 });
+    }
+
+    if (n === 3) {                                            // four processes, each with its own token
+      const GROW0 = 900;
+      vBot.set(itemsProc, { animate: true, fill: true });     // the thread turns fade out; four blocks are added empty
+      tok.forEach((t, w) => {
+        t.g.style.opacity = 1;
+        animate(t.g, arcPts(P[7], Q[w], 22).map(p => ({ transform: tr(p.x, p.y) })), { duration: 800, easing: "linear" });
+        if (w > 0) animate(t.inner, pop, { duration: 400, easing: EASE.pop });
+      });
+      vBot.fill({ duration: 16 * UNIT_MS, delay: GROW0 });    // all four grow at once, over one task's time
+      vBot.finish(4, "", { animate: true, delay: GROW0 + 4 * UNIT_MS + 150 });
+      animate(note2, fade(1, 0), { duration: 400 });
+      animate(note3, rise, { duration: 500, delay: 500 });
+      animate(subs[1], fade(1, 0), { duration: 400 });
+      animate(subs[2], fade(0, 1), { duration: 400, delay: 300 });
+    }
+
+    if (n === 4) animate(foot, rise, { duration: 600 });
+  },
+});
+</script>
+</body>
+</html>
