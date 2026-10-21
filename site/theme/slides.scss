@@ -132,6 +132,8 @@ $red: #CC0000;
 .reveal .footer { font-size: 15px !important; color: #6D6E71; }
 // On the red divider slides the slide number would be dark red on red; the run sheet cues by slide number.
 .reveal.has-dark-background .slide-number, .reveal.has-dark-background .slide-number a { color: #FFE9E9 !important; }
+// On the red divider slides the gray footer is hard to read: make it white.
+.reveal.has-dark-background .footer, .reveal.has-dark-background .footer p { color: #FFFFFF !important; }
 .reveal section.thank-you-slide h2 { border: 0; }
 // Quarto marks level-1 section slides as .title-slide, which ncsu.scss paints white: keep dividers red.
 .reveal .slides section.divider.title-slide { background: transparent !important; }
