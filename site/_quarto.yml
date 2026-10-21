@@ -1,0 +1,48 @@
+project:
+  type: website
+  output-dir: _site
+  resources:
+    - images/
+    - slides/anim/
+
+website:
+  title: "Parallelization with Python"
+  description: "Spread a Python task across your computer's cores with multiprocessing, from NC State University Libraries' Data Science Services."
+  site-url: "https://ncsu-libraries.github.io/parallelization-with-python/"
+  repo-url: "https://github.com/NCSU-Libraries/parallelization-with-python"
+  favicon: images/favicon.svg
+  page-navigation: true
+  bread-crumbs: false
+  navbar:
+    background: "#CC0000"
+    foreground: "#FFFFFF"
+    logo: images/lib_logo_white.png
+    logo-alt: "NC State University Libraries"
+    title: false
+    collapse-below: lg
+    left:
+      - href: index.qmd
+        text: Home
+      # Notebook and setup pages come later.
+    right:
+      - href: slides/index.qmd
+        text: Slides
+      - icon: github
+        href: "https://github.com/NCSU-Libraries/parallelization-with-python"
+        aria-label: "Source on GitHub"
+  page-footer:
+    left: "NC State University Libraries · [Data Science Services](https://www.lib.ncsu.edu/staff/department/data-science-services) · Help: [go.ncsu.edu/getdatahelp](https://go.ncsu.edu/getdatahelp)"
+    right: "Content [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · Code MIT"
+
+format:
+  html:
+    theme:
+      light: [cosmo, theme/site.scss]
+    toc: true
+    toc-depth: 2
+    code-copy: true
+    code-overflow: wrap
+    smooth-scroll: true
+    anchor-sections: true
+    link-external-newwindow: true
+    lang: en

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>This laptop: 14 cores</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A1: the main idea. One laptop, fourteen cores, and a loop that uses one of them.
+     Everything inside #scene is drawn where it stands at beats 1 to 3; the scene slides to re-center the composition. */
+  #scene { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+
+  .c-dim  { fill: var(--idle); stroke: var(--overhead); stroke-width: 3; }
+  .c-wait { fill: var(--paper); stroke: var(--overhead); stroke-width: 3; opacity: 0; }
+  .c-lit  { fill: var(--red); stroke: var(--red-deep); stroke-width: 3; opacity: 0; }
+  .c-ring { fill: none; stroke: var(--red); stroke-width: 6; opacity: 0; }
+  .chip-base  { fill: var(--idle); }
+  .chip-plate { fill: var(--paper); stroke: var(--line); stroke-width: 5; }
+  .chip-pin   { fill: var(--line); }
+  .key        { font: 600 24px var(--font); fill: var(--muted); }
+  .key-k      { font-weight: 800; fill: var(--ink); }
+  .dot        { fill: var(--red); opacity: 0; }
+
+  .code-card {
+    position: absolute; left: 82px; top: 176px; width: 340px; height: 170px; padding: 20px 22px 0;
+    background: var(--ink); color: var(--paper); border-radius: 22px; opacity: 0;
+  }
+  .cc-head { display: flex; justify-content: space-between; align-items: center; height: 36px; }
+  .cc-tag  { font: 600 22px var(--font); color: var(--overhead); }
+  .cc-run  { display: flex; align-items: center; gap: 10px; font: 700 22px var(--font); color: var(--paper); }
+  .cc-run i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 5px color-mix(in srgb, var(--red) 35%, transparent); }
+  .cc-code { margin: 14px 0 0; font: 400 22px/1.75 var(--mono); color: var(--paper); white-space: pre; font-variant-ligatures: none; }
+  .cc-code .kw { color: var(--red-soft); }
+  .cc-code .hit { display: inline-block; margin: 0 -8px; padding: 0 8px; border-radius: 9px; background: color-mix(in srgb, var(--paper) 14%, transparent); }
+
+  /* the callout for the cores that wait: a dashed box, the same language as the dashed cores, pointing at the chip */
+  .callout {
+    position: absolute; left: 82px; top: 386px; width: 312px; padding: 16px 24px 18px; display: flex; align-items: center; gap: 18px;
+    background: var(--paper); border: 5px dashed var(--overhead); border-radius: 24px; opacity: 0;
+  }
+  .callout::after { content: ""; position: absolute; right: -37px; top: 50%; margin-top: -19px; border-left: 30px solid var(--overhead); border-top: 19px solid transparent; border-bottom: 19px solid transparent; }
+  .callout b { font: 800 92px/1 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .callout span { font: 700 32px/1.12 var(--font); color: var(--ink); }
+  .caption { position: absolute; left: 82px; top: 386px; width: 340px; margin: 0; font: 800 40px/1.18 var(--font); color: var(--red); opacity: 0; }
+
+  .meter-text { position: absolute; left: 464px; top: 594px; width: 720px; margin: 0; font: 700 32px/1.15 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; }
+  .meter-text b { color: var(--red); font-weight: 800; }
+
+  .colab { position: absolute; left: 882px; top: 176px; width: 300px; height: 340px; padding: 26px 24px 0; background: var(--paper); border: 4px solid var(--line); border-radius: 26px; opacity: 0; }
+  .co-name  { font: 800 32px/1.2 var(--font); color: var(--ink); margin: 0; text-align: center; }
+  .colab svg { display: block; width: 236px; height: 142px; margin: 16px auto 0; overflow: visible; }
+  .co-count { margin: 14px 0 0; font: 700 38px/1 var(--font); color: var(--ink); text-align: center; }
+  .co-count b { font-size: 76px; font-weight: 800; color: var(--red); margin-right: 10px; }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">This laptop: 14 cores</h1>
+
+  <div id="scene">
+    <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+    <div class="code-card" id="code" aria-hidden="true">
+      <div class="cc-head"><span class="cc-tag">your code</span><span class="cc-run"><i></i>running</span></div>
+      <pre class="cc-code"><span class="kw">for</span> forest <span class="kw">in</span> forests:
+    <span class="hit">burn(forest)</span></pre>
+    </div>
+
+    <div class="callout" id="callout" aria-hidden="true"><b>13</b><span>cores<br>waiting</span></div>
+    <p class="caption" id="caption" aria-hidden="true">This workshop:<br>how to use<br>the rest</p>
+    <p class="meter-text" id="meterText" aria-hidden="true"></p>
+  </div>
+
+  <div class="colab" id="colab" aria-hidden="true">
+    <p class="co-name">Google Colab</p>
+    <svg viewBox="0 0 200 120" id="miniChip"></svg>
+    <p class="co-count"><b>2</b>cores</p>
+  </div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+
+// ---- geometry (stage pixels). The chip is drawn 1.2 times its base size. -----------------------------------------------
+const S = 1.2;
+const Y0 = 116;                                                             // top of the chip's pins at beats 1 to 4
+const PLATE = { x: 464, y: Y0 + 14, w: 720, h: 432 };
+const PC = { size: 110, gap: 17, cols: 5, rows: 2, r: 24 };                 // performance cores: large
+const EC = { size: 72, gap: 17, n: 4, r: 17 };                              // efficiency cores: small
+const PIN = 14;                                                             // how far the pins stand out of the plate
+const px0 = PLATE.x + (PLATE.w - (PC.cols * PC.size + (PC.cols - 1) * PC.gap)) / 2;
+const py0 = PLATE.y + 46;
+const eRowY = py0 + PC.rows * PC.size + (PC.rows - 1) * PC.gap + 30;
+const METER = { x: PLATE.x, y: Y0 + 524, w: PLATE.w, h: 30, gap: 8, n: 14 };
+METER.cw = (METER.w - (METER.n - 1) * METER.gap) / METER.n;
+// where the scene stands at each beat: re-centered under the title as things appear and leave
+const SCENE = {
+  0: `translate(${640 - (PLATE.x + PLATE.w / 2)}px, ${156 - Y0}px)`,          // the chip alone, centered
+  4: `translate(${(1280 - (PLATE.w + 2 * PIN + 36 + 300)) / 2 - (PLATE.x - PIN)}px, 0px)`,   // the chip moves left for the Colab card (36 px gap, 300 px card)
+};
+
+// A dash pattern that closes evenly around a rounded rect, so the outline has no odd short dash.
+function dashFor(w, h, r, target) {
+  const per = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+  const n = Math.max(6, Math.round(per / target)), p = per / n;
+  return `${(p * 0.56).toFixed(2)} ${(p * 0.44).toFixed(2)}`;
+}
+
+const art = document.getElementById("art");
+
+// ---- the chip ---------------------------------------------------------------------------------------------------------
+const gChip = svg("g", {}, art);
+svg("rect", { class: "chip-base", x: PLATE.x, y: PLATE.y + PIN, width: PLATE.w, height: PLATE.h, rx: 40 }, gChip);
+for (let i = 0; i < 11; i++) {                                       // pins along the long sides
+  const x = PLATE.x + 46 + i * ((PLATE.w - 92 - 31) / 10);
+  svg("rect", { class: "chip-pin", x, y: PLATE.y - PIN, width: 31, height: PIN + 8, rx: 6 }, gChip);
+  svg("rect", { class: "chip-pin", x, y: PLATE.y + PLATE.h - 8, width: 31, height: PIN + 8, rx: 6 }, gChip);
+}
+for (let i = 0; i < 7; i++) {                                        // and the short ones
+  const y = PLATE.y + 46 + i * ((PLATE.h - 92 - 31) / 6);
+  svg("rect", { class: "chip-pin", x: PLATE.x - PIN, y, width: PIN + 8, height: 31, rx: 6 }, gChip);
+  svg("rect", { class: "chip-pin", x: PLATE.x + PLATE.w - 8, y, width: PIN + 8, height: 31, rx: 6 }, gChip);
+}
+svg("rect", { class: "chip-plate", x: PLATE.x, y: PLATE.y, width: PLATE.w, height: PLATE.h, rx: 38 }, gChip);
+svg("circle", { class: "chip-pin", cx: PLATE.x + 26, cy: PLATE.y + 26, r: 8 }, gChip);   // pin 1 marker
+
+// ---- the cores: 10 performance (reading order), then 4 efficiency ------------------------------------------------------
+// each core is three stacked layers so that every change is a fade: dim, waiting (dashed outline) and lit (red)
+const cores = [];
+function makeCore(x, y, s, r) {
+  const g = svg("g", {}, gChip);
+  const at = { x, y, width: s, height: s, rx: r };
+  const dim = svg("rect", Object.assign({ class: "c-dim" }, at), g);
+  const wait = svg("rect", Object.assign({ class: "c-wait" }, at), g);
+  wait.style.strokeDasharray = dashFor(s, s, r, 19);
+  const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), g);
+  const ring = svg("rect", Object.assign({ class: "c-ring fb" }, at), g);
+  cores.push({ dim, wait, lit, ring, cx: x + s / 2, cy: y + s / 2 });
+}
+for (let r = 0; r < PC.rows; r++) for (let c = 0; c < PC.cols; c++) makeCore(px0 + c * (PC.size + PC.gap), py0 + r * (PC.size + PC.gap), PC.size, PC.r);
+for (let k = 0; k < EC.n; k++) makeCore(px0 + k * (EC.size + EC.gap), eRowY, EC.size, EC.r);
+
+// the P/E key, in the corner of the chip
+{
+  const kx = PLATE.x + PLATE.w - 51 - 208, ky = eRowY + 2;
+  svg("rect", { class: "c-dim", x: kx, y: ky, width: 30, height: 30, rx: 9 }, gChip);
+  svg("text", { class: "key", x: kx + 46, y: ky + 25 }, gChip).innerHTML = '<tspan class="key-k">P</tspan><tspan dx="12">performance</tspan>';
+  svg("rect", { class: "c-dim", x: kx + 6, y: ky + 44, width: 18, height: 18, rx: 6 }, gChip);
+  svg("text", { class: "key", x: kx + 46, y: ky + 62 }, gChip).innerHTML = '<tspan class="key-k">E</tspan><tspan dx="12">efficiency</tspan>';
+}
+
+// ---- the meter: one cell per core -------------------------------------------------------------------------------------
+const gMeter = svg("g", {}, art);
+gMeter.style.opacity = 0;
+const cells = [];
+for (let i = 0; i < METER.n; i++) {
+  const at = { x: METER.x + i * (METER.cw + METER.gap), y: METER.y, width: METER.cw, height: METER.h, rx: 10 };
+  const dim = svg("rect", Object.assign({ class: "c-dim" }, at), gMeter);
+  const wait = svg("rect", Object.assign({ class: "c-wait" }, at), gMeter);
+  wait.style.strokeDasharray = dashFor(METER.cw, METER.h, 10, 15);
+  const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), gMeter);
+  cells.push({ dim, wait, lit });
+}
+
+// ---- the work packet that carries the loop's work to a core -----------------------------------------------------------
+const dot = svg("circle", { class: "dot", cx: 0, cy: 0, r: 11 }, art);
+const SEND = { x0: 422, y0: 304, x1: cores[0].cx, y1: cores[0].cy };     // card edge -> the first core
+function bez(t) {
+  const u = 1 - t, c1 = { x: SEND.x0 + 80, y: SEND.y0 }, c2 = { x: SEND.x1 - 80, y: SEND.y1 };
+  return { x: u * u * u * SEND.x0 + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * SEND.x1,
+           y: u * u * u * SEND.y0 + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * SEND.y1 };
+}
+const PATH = Array.from({ length: 13 }, (_, i) => bez(i / 12));
+
+// ---- the Colab card: its own little 2-core chip ------------------------------------------------------------------------
+const mini = document.getElementById("miniChip");
+svg("rect", { class: "chip-base", x: 10, y: 20, width: 180, height: 95, rx: 24 }, mini);
+for (let i = 0; i < 4; i++) {
+  svg("rect", { class: "chip-pin", x: 33 + i * 42, y: 2, width: 20, height: 20, rx: 5 }, mini);
+  svg("rect", { class: "chip-pin", x: 33 + i * 42, y: 104, width: 20, height: 16, rx: 5 }, mini);
+}
+svg("rect", { class: "chip-plate", x: 10, y: 10, width: 180, height: 95, rx: 24 }, mini);
+const miniCores = [34, 111].map(x => {
+  const at = { x, y: 30, width: 55, height: 55, rx: 14 };
+  svg("rect", Object.assign({ class: "c-dim" }, at), mini);
+  const lit = svg("rect", Object.assign({ class: "c-lit fb" }, at), mini);
+  return { lit };
+});
+
+// ---- state helpers ----------------------------------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const scene = $("scene"), code = $("code"), meterText = $("meterText"), callout = $("callout"), caption = $("caption"), colab = $("colab");
+const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+const pct = k => Math.round(100 * k / 14);
+function meterHTML(k) {
+  if (k >= 14) return "<b>14</b> of 14 busy · <b>100%</b>";
+  if (k <= 1) return `<b>${k}</b> of 14 cores busy · <b>${pct(k)}%</b>`;
+  return `<b>${k}</b> of 14 busy · <b>${pct(k)}%</b>`;
+}
+const litCount = n => (n === 0 ? 0 : n < 3 ? 1 : 14);
+
+// ---- the animation ------------------------------------------------------------------------------------------------------
+defineAnimation({
+  beats: 4,
+  alt: [
+    "A processor with 14 cores: 10 large performance cores (P) and 4 smaller efficiency cores (E). All 14 are idle.",
+    "A loop, for forest in forests: burn(forest), starts running. Exactly one core lights up. The meter reads 1 of 14 cores busy, 7%.",
+    "The other 13 cores are idle, shown with dashed outlines, and a callout says 13 cores waiting.",
+    "All 14 cores light up. The meter reads 14 of 14 busy, 100%. The caption says: This workshop: how to use the rest.",
+    "The code card leaves and the chip moves left. A second, smaller card appears: Google Colab, 2 cores, with its own little 2-core chip.",
+  ],
+
+  render(n) {
+    const lit = litCount(n), dashed = n === 2;
+    scene.style.transform = SCENE[n] || "";
+    cores.forEach((c, i) => {
+      op(c.lit, i < lit ? 1 : 0);
+      op(c.wait, i >= lit && dashed ? 1 : 0);
+      op(c.ring, 0);
+    });
+    cells.forEach((c, i) => {
+      op(c.lit, i < lit ? 1 : 0);
+      op(c.wait, i >= lit && dashed ? 1 : 0);
+    });
+    op(code, n >= 1 && n < 4 ? 1 : 0);
+    op(gMeter, n >= 1 ? 1 : 0);
+    op(meterText, n >= 1 ? 1 : 0);
+    meterText.innerHTML = meterHTML(lit);
+    op(callout, n === 2 ? 1 : 0);
+    op(caption, n === 3 ? 1 : 0);
+    op(colab, n >= 4 ? 1 : 0);
+    miniCores.forEach(c => op(c.lit, n >= 4 ? 1 : 0));
+    op(dot, 0);
+  },
+
+  enter(n, { animate, later }) {
+    const rise = (y) => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+    const pop = (from) => [{ opacity: 0, transform: `scale(${from})` }, { opacity: 1, transform: "scale(1)" }];
+    const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+
+    if (n === 1) {
+      // the chip makes room for the code card, and rises a little as the meter is added below it
+      animate(scene, [{ transform: SCENE[0] }, { transform: "translate(0px, 0px)" }], { duration: 800, easing: EASE.inOut });
+      animate(code, fade(0, 1), { duration: 500, delay: 350 });
+      animate(gMeter, rise(10), { duration: 500, delay: 500 });
+      animate(meterText, rise(10), { duration: 500, delay: 500 });
+      meterText.innerHTML = meterHTML(0);
+      // the loop sends its first piece of work to a core: a packet crosses to the first core
+      animate(dot, PATH.map((p, i) => ({ opacity: i === 0 || i === 12 ? 0 : 1, transform: `translate(${p.x}px, ${p.y}px)` })), { duration: 700, delay: 1200, easing: EASE.inOut });
+      const t = 1900;
+      animate(cores[0].lit, pop(0.84), { duration: 400, delay: t, easing: EASE.pop });
+      animate(cells[0].lit, pop(0.84), { duration: 400, delay: t, easing: EASE.pop });
+      // a soft pulse, twice (the first keyframe is invisible: a delayed animation shows its first keyframe while it waits)
+      for (const d of [0, 650]) animate(cores[0].ring, [{ opacity: 0, transform: "scale(1)" }, { opacity: 0.55, transform: "scale(1.1)", offset: 0.12 }, { opacity: 0, transform: "scale(1.45)" }], { duration: 1000, delay: t + 100 + d });
+      later(t + 160, () => { meterText.innerHTML = meterHTML(1); });          // the number follows the core as it comes on
+    }
+
+    if (n === 2) {
+      for (let i = 1; i < 14; i++) {
+        animate(cores[i].wait, fade(0, 1), { duration: 450, delay: (i - 1) * 40 });
+        animate(cells[i].wait, fade(0, 1), { duration: 450, delay: (i - 1) * 40 });
+      }
+      animate(callout, [{ opacity: 0, transform: "translateX(-24px)" }, { opacity: 1, transform: "translateX(0)" }], { duration: 600, delay: 500 });
+    }
+
+    if (n === 3) {
+      animate(callout, fade(1, 0), { duration: 300 });
+      const step = 95, t0 = 200;
+      for (let i = 1; i < 14; i++) {
+        const d = t0 + (i - 1) * step;
+        animate(cores[i].wait, fade(1, 0), { duration: 300, delay: d });
+        animate(cores[i].lit, pop(0.84), { duration: 400, delay: d, easing: EASE.pop });
+        animate(cells[i].wait, fade(1, 0), { duration: 300, delay: d });
+        animate(cells[i].lit, pop(0.84), { duration: 400, delay: d, easing: EASE.pop });
+        later(d + 160, () => { meterText.innerHTML = meterHTML(i + 1); });
+      }
+      animate(caption, [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 600, delay: t0 + 13 * step + 250 });
+    }
+
+    if (n === 4) {
+      // the loop's work is done: the left column leaves with the scene, the chip moves left, a second machine comes in
+      animate(scene, [{ transform: "translate(0px, 0px)" }, { transform: SCENE[4] }], { duration: 900, easing: EASE.inOut });
+      animate(code, fade(1, 0), { duration: 500 });
+      animate(caption, fade(1, 0), { duration: 500 });
+      animate(colab, [{ opacity: 0, transform: "translateX(70px)" }, { opacity: 1, transform: "translateX(0)" }], { duration: 750, delay: 450 });
+      miniCores.forEach((c, i) => animate(c.lit, pop(0.84), { duration: 400, delay: 1250 + i * 200, easing: EASE.pop }));
+    }
+  },
+});
+</script>
+</body>
+</html>

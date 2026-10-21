@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animation dev harness</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 14px 20px 28px; background: #E4E7EA; font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1F2328; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; width: 1280px; margin: 0 auto 12px; }
+  button, select { font: inherit; padding: 6px 16px; border: 1px solid #9AA0A6; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; }
+  button:hover { border-color: #CC0000; }
+  button:disabled { opacity: .45; cursor: default; }
+  .readout { min-width: 190px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .readout small { font-weight: 400; color: #57606A; }
+  .spacer { flex: 1; }
+  .hint { color: #57606A; font-size: 13px; }
+  .frame { position: relative; width: 1280px; height: 720px; margin: 0 auto; background: #fff; box-shadow: 0 0 0 1px #9AA0A6, 0 8px 28px rgba(0,0,0,.14); }
+  iframe { display: block; width: 1280px; height: 720px; border: 0; background: transparent; }
+  .safe { position: absolute; inset: 0; pointer-events: none; display: none; }
+  .safe.on { display: block; }
+  /* where the deck's footer, slide number and logo can cover a background iframe */
+  .safe i { position: absolute; background: repeating-linear-gradient(135deg, rgba(204,0,0,.16) 0 6px, transparent 6px 12px); border: 2px dashed rgba(204,0,0,.5); }
+  .alt { width: 1280px; margin: 12px auto 0; color: #57606A; font-size: 14px; min-height: 2.8em; }
+  .alt b { color: #1F2328; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <label>Animation <select id="pick"></select></label>
+  <button id="prev" title="Previous beat (snaps)">Prev</button>
+  <span class="readout" id="readout">beat 0 / 0</span>
+  <button id="next" title="Next beat (animates)">Next</button>
+  <button id="reload" title="Reload the page at beat 0">Reload</button>
+  <label><input type="checkbox" id="safe"> safe area</label>
+  <span class="spacer"></span>
+  <span class="hint">Arrow keys or space: step. 0-9: jump (snap). The page below gets the same messages the deck sends.</span>
+</div>
+<div class="frame">
+  <iframe id="f" title="animation"></iframe>
+  <div class="safe" id="safeBox"><i style="left:0;right:0;bottom:0;height:44px"></i><i style="right:0;bottom:0;width:190px;height:70px"></i></div>
+</div>
+<p class="alt" id="alt"></p>
+
+<script>
+"use strict";
+// The harness plays the deck: it keeps the beat, posts {type: "beat", n} to the page like deck-sync.js does, and
+// answers the page's bridge messages (JSON {method: "next" | "prev"}) the way reveal would.
+const KNOWN = ["cores", "lanes-primer"];                     // add the page names as they are built
+const q = new URLSearchParams(location.search);
+const name = (q.get("a") || KNOWN[0]).replace(/\.html$/, "");
+let n = Math.max(0, parseInt(q.get("b"), 10) || 0);
+let beats = 0;
+const $ = id => document.getElementById(id);
+const frame = $("f");
+
+const pick = $("pick");
+for (const k of [...new Set([...KNOWN, name])]) pick.add(new Option(k, k, false, k === name));
+pick.onchange = () => { location.search = "?a=" + pick.value; };
+
+function api() { try { return frame.contentWindow.__anim || null; } catch (e) { return null; } }
+function post() { try { frame.contentWindow.postMessage({ type: "beat", n }, "*"); } catch (e) {} }
+function paint() {
+  const a = api();
+  if (a) beats = a.beats;
+  $("readout").innerHTML = `beat ${a ? a.beat : n} / ${beats}` + (a && a.busy ? " <small>animating</small>" : "");
+  $("prev").disabled = n <= 0;
+  $("next").disabled = n >= beats;
+  const alt = a && a.alt && a.alt[a.beat];
+  $("alt").innerHTML = alt ? `<b>Text alternative, beat ${a.beat}:</b> ${alt}` : "";
+}
+function go(to, snap) {
+  to = Math.min(beats, Math.max(0, to));
+  if (to === n) return;
+  n = to;
+  const a = api();
+  if (snap && a) a.show(n, true); else post();
+  paint();
+}
+$("next").onclick = () => go(n + 1);
+$("prev").onclick = () => go(n - 1);
+$("reload").onclick = () => { n = 0; load(); };
+$("safe").onchange = e => $("safeBox").classList.toggle("on", e.target.checked);
+
+addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") go(n + 1);
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") go(n - 1);
+  else if (/^[0-9]$/.test(e.key)) go(+e.key, true);
+  else return;
+  e.preventDefault();
+});
+
+addEventListener("message", e => {
+  if (e.source !== frame.contentWindow) return;
+  let d = e.data;
+  if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { return; } }
+  if (d && d.method === "next") go(n + 1);                    // reveal.next(): the next fragment, or the next slide
+  else if (d && d.method === "prev") go(n - 1);
+  else if (d && d.type === "anim-ready") { beats = d.beats; post(); paint(); }
+});
+
+function load() {
+  frame.src = `${name}.html` + (n ? `?b=${n}` : "");
+  frame.onload = () => { post(); paint(); };
+}
+load();
+setInterval(paint, 250);
+</script>
+</body>
+</html>

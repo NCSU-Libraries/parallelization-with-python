@@ -1,0 +1,149 @@
+/*-- scss:defaults --*/
+// Layered after ncsu.scss: the pieces this deck uses.
+
+/*-- scss:rules --*/
+$mono: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+$ink: #1F1F1F;
+$body: #444444;
+$muted: #6D6E71;
+$panel: #F3F1ED;
+$card: #FFFEFC;
+$card-border: #E6E1DA;
+$pale-red: #FBE3E0;
+$deep-red: #8A0000;
+$red: #CC0000;
+
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap");
+
+.reveal { font-size: 40px; }
+.reveal .slides section { text-align: left; }
+.reveal h2 { font-size: 1.45em; margin-bottom: 0.45em; }
+
+.reveal .eyebrow {
+  font-size: 0.42em; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: $red; margin: 0 0 6px;
+}
+.reveal .muted { font-size: 0.56em; line-height: 1.4; color: $muted; }
+.reveal .small { font-size: 0.6em; line-height: 1.4; }
+.reveal .big-quote {
+  font-size: 1.5em; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px; color: $ink; margin: 14px 0 22px;
+}
+.reveal .statement {
+  font-size: 1.35em; font-weight: 800; line-height: 1.12; color: $ink; letter-spacing: -0.4px;
+  em { font-style: normal; color: $red; }
+}
+
+// What attendees type: a dark terminal-like block with a label
+.reveal .type {
+  position: relative; margin: 26px 0 14px; background: #111; color: #F5F5F5; border-radius: 12px;
+  padding: 22px 26px 18px; font-family: $mono; font-size: 0.62em; line-height: 1.45; box-shadow: 0 10px 26px rgba(0,0,0,.18);
+  p { margin: 0; }
+  code { background: none; color: inherit; font-size: 1em; padding: 0; }
+  &::before {
+    content: "You type"; position: absolute; top: -13px; left: 18px; background: $red; color: #FFF;
+    font-family: "Inter", sans-serif; font-size: 0.55em; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 2px 10px; border-radius: 4px;
+  }
+  .cmd { color: #FFB4B4; font-weight: 700; }
+}
+.reveal .type.shell::before { content: "In your terminal"; background: #555; }
+.reveal .type.lg { font-size: 0.7em; }
+// Commands inside a card would otherwise be the smallest text on the slide.
+.reveal .card .type { font-size: 0.85em; }
+// A path-to-command mapping: shown, not typed.
+.reveal .type.diagram::before { display: none; }
+
+// The note Claude can't see
+.reveal .note-card {
+  background: #FFF6C9; border: 1px solid #E8D68A; border-radius: 6px; padding: 22px 28px; transform: rotate(-0.6deg);
+  box-shadow: 0 12px 26px rgba(0,0,0,.12); font-size: 0.7em; line-height: 1.4; color: $ink; margin: 10px 0 18px;
+  p { margin: 0; }
+  .from { display: block; font-size: 0.62em; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #7A6400; margin-bottom: 8px; }
+}
+
+// The official number
+.reveal .answer {
+  display: inline-block; border: 3px solid $red; border-radius: 14px; padding: 14px 30px; margin: 10px 0 16px;
+  .label { display: block; font-size: 0.42em; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: $muted; }
+  .value { display: block; font-size: 2.1em; font-weight: 800; color: $red; line-height: 1.05; font-variant-numeric: tabular-nums; }
+}
+
+// Cards
+.reveal .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+.reveal .cards.two { grid-template-columns: 1fr 1fr; }
+.reveal .cards.three { grid-template-columns: 1fr 1fr 1fr; }
+.reveal .card {
+  background: $card; border: 1px solid $card-border; border-radius: 12px; padding: 16px 20px; font-size: 0.64em;
+  line-height: 1.38; color: $body;
+  p { margin: 0 0 6px; }
+  ul { margin: 4px 0 0 1em; padding: 0; }
+  li { margin: 2px 0; }
+}
+.reveal .card.dark { background: #1A1A1A; color: #EEE; border: 0; .card-title { color: #FFF; } }
+.reveal .card.red { background: $pale-red; border-color: #F2C4BE; color: $ink; }
+.reveal .card-title { display: block; font-size: 1.2em; font-weight: 800; line-height: 1.2; color: $ink; margin-bottom: 8px; }
+.reveal .label { display: block; font-size: 0.4em; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: $muted; margin: 0 0 4px; }
+.reveal .pill {
+  display: inline-block; background: $pale-red; color: $deep-red; font-weight: 700; border-radius: 999px;
+  padding: 8px 20px; font-size: 0.58em; margin: 14px 8px 0 0;
+}
+.reveal .pill.dark { background: #1A1A1A; color: #FFF; }
+
+// The loop: read → plan → act → check
+.reveal .loop { display: flex; align-items: stretch; gap: 10px; margin: 26px 0 10px; }
+.reveal .loop .stage {
+  flex: 1; border-radius: 12px; padding: 16px 16px 14px; background: $panel; font-size: 0.5em; line-height: 1.35; color: $body;
+  b { display: block; font-size: 1.6em; color: $ink; margin-bottom: 4px; }
+}
+.reveal .loop .stage.on { background: $red; color: #FFF; b { color: #FFF; } }
+.reveal .loop .arrow { align-self: center; font-size: 0.9em; color: $muted; }
+
+// Checklist (finish line)
+.reveal ul.finish { list-style: none; margin: 10px 0 0; padding: 0; font-size: 0.66em; line-height: 1.5; }
+.reveal ul.finish li { padding: 5px 0 5px 44px; position: relative; border-bottom: 1px dashed $card-border; }
+.reveal ul.finish li::before {
+  content: ""; position: absolute; left: 4px; top: 11px; width: 22px; height: 22px; border: 3px solid $red; border-radius: 5px;
+}
+
+// Screenshots
+.reveal img.shot { border: 1px solid #DDD; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.15); }
+.reveal .caption { font-size: 0.42em; color: $muted; margin-top: 6px; }
+
+// Section divider: red slide
+.reveal .slides section.divider h1 { border: 0; padding: 0; color: #FFF; font-size: 2.3em; letter-spacing: -1px; }
+.reveal .slides section.divider .eyebrow { color: #FFD2D2; font-size: 0.6em; }
+.reveal .slides section.divider p { color: #FFE9E9; font-size: 0.8em; }
+
+.reveal kbd {
+  background: #FFF; color: $ink; border: 1px solid #BBB; border-bottom-width: 4px; border-radius: 6px;
+  padding: 1px 9px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 0.85em;
+}
+.reveal code { color: $deep-red; background: $panel; border-radius: 5px; padding: 1px 6px; font-size: 0.9em; }
+.reveal table { font-size: 0.66em; }
+.reveal table th { border-bottom: 3px solid $red !important; }
+
+.reveal .qr.qr-big { width: 300px; height: 300px; }
+.reveal .qr { width: 210px; height: 210px; image-rendering: pixelated; border: 8px solid #FFF; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.reveal .two-col { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 34px; align-items: start; }
+.reveal .two-col.even { grid-template-columns: 1fr 1fr; }
+.reveal .center-v { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+
+// ncsu.scss sizes the logo for a title-heavy deck; keep it small in the corner here.
+.reveal .slide-logo { height: 34px !important; max-height: 34px !important; width: auto !important; max-width: none !important; bottom: 14px !important; right: 18px !important; }
+.reveal .footer { font-size: 15px !important; color: #6D6E71; }
+// On the red divider slides the slide number would be dark red on red; the run sheet cues by slide number.
+.reveal.has-dark-background .slide-number, .reveal.has-dark-background .slide-number a { color: #FFE9E9 !important; }
+.reveal section.thank-you-slide h2 { border: 0; }
+// Quarto marks level-1 section slides as .title-slide, which ncsu.scss paints white: keep dividers red.
+.reveal .slides section.divider.title-slide { background: transparent !important; }
+.reveal .slides section.divider h1 { background: none !important; }
+
+// Slides 3-5 are pictures of the Data Science Services deck, with the title in the picture.
+.reveal .slides section.dss > h2 { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; margin: 0; padding: 0; }
+.reveal .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important; margin: -1px !important; padding: 0 !important; }
+// The deck's logo, footer and slide number would sit on top of those pictures.
+.reveal-viewport.dss-slide .slide-logo, .reveal-viewport.dss-slide .footer, .reveal-viewport.dss-slide .slide-number { display: none !important; }
+.reveal .slides section.dss-team img { display: block; width: 100%; max-width: none; margin: 0 0 8px; }
+.reveal .slides section.dss-team p { font-size: 0.92em; line-height: 1.35; margin: 0 34px; }
+
+// Code fonts draw != <= >= == as single glyphs (ligatures). Show every character as typed, so nobody types ≠.
+.reveal code, .reveal pre, .reveal kbd, .reveal .type { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }

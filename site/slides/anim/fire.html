@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One task, then a thousand</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A9: the forest-fire task. One run, three runs, the sweep of 1,008 runs, and the curve they draw.
+     The data is data/fire-runs.json (burn steps of three 64 x 64 forests) and data/sweep.json (1,008 real runs). */
+  .f-ground { fill: var(--ground); }
+  .f-tree   { fill: var(--tree); }
+  .forest path, .forest rect { shape-rendering: crispEdges; }     /* cells meet edge to edge: no antialiased seams between them */
+  .f-frame  { fill: none; stroke: var(--line); stroke-width: 4; }
+  .tile     { opacity: 0; }
+  .dot      { opacity: 0; }
+  .grid     { stroke: var(--idle); stroke-width: 3; stroke-linecap: round; }
+  .grid.base { stroke: var(--overhead); }
+  .tick-l   { font: 600 22px var(--font); fill: var(--muted); }
+  .axis-t   { font: 600 24px var(--font); fill: var(--muted); }
+  .band     { fill: var(--hunt); opacity: 0; }
+  .mean-halo { fill: none; stroke: var(--paper); stroke-width: 13; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+  .mean     { fill: none; stroke: var(--red); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+  .arrow    { fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+
+  .t { position: absolute; margin: 0; opacity: 0; white-space: nowrap; }
+  #label0  { left: 716px; top: 150px; font: 800 48px/1.17 var(--font); color: var(--ink); }
+  #label0 span { color: var(--red); }
+  #counter1 { left: 716px; top: 372px; font-variant-numeric: tabular-nums; }
+  #counter1 small { display: block; font: 700 36px/1.2 var(--font); color: var(--muted); }
+  #counter1 b { display: block; font: 800 128px/1.05 var(--font); color: var(--red); letter-spacing: -2px; }
+
+  .flabel { font: 800 30px/1.1 var(--font); color: var(--ink); text-align: center; width: 352px; }
+  .flabel span { color: var(--muted); font-weight: 600; }
+  .fcount { font: 700 30px/1.1 var(--font); color: var(--ink); text-align: center; width: 352px; font-variant-numeric: tabular-nums; }
+  .fcount b { color: var(--red); font-weight: 800; }
+
+  .legend { position: absolute; left: 48px; top: 628px; display: flex; gap: 44px; align-items: center; font: 600 24px/1 var(--font); color: var(--ink); white-space: nowrap; opacity: 0; }
+  .legend span { display: flex; align-items: center; gap: 12px; }
+  .legend i { display: block; width: 30px; height: 30px; border-radius: 8px; }
+  .sw-tree { background: var(--tree); } .sw-bare { background: var(--ground); box-shadow: inset 0 0 0 3px var(--line); }
+  .sw-front { background: var(--hunt); } .sw-burn { background: var(--flame); } .sw-ash { background: var(--ash); }
+
+  #caption3 { left: 48px; width: 1184px; top: 604px; text-align: center; font: 800 29px/1.2 var(--font); color: var(--ink); }
+  #caption3 span { font-weight: 600; color: var(--red); }
+  #tip { right: 756px; top: 196px; text-align: right; font: 800 34px/1.12 var(--font); color: var(--ink); }
+  #tip small { display: block; margin-top: 4px; font: 600 24px/1.2 var(--font); color: var(--muted); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">One task, then a thousand</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <p class="t" id="label0" aria-hidden="true"><span>One run:</span><br>a random forest,<br>60% trees</p>
+  <p class="t" id="counter1" aria-hidden="true"><small>burned:</small><b>0%</b></p>
+  <div class="legend" id="legend" aria-hidden="true">
+    <span><i class="sw-tree"></i>tree</span><span><i class="sw-bare"></i>bare ground</span><span><i class="sw-front"></i>fire front</span><span><i class="sw-burn"></i>burning</span><span><i class="sw-ash"></i>burnt</span>
+  </div>
+  <p class="t" id="caption3" aria-hidden="true">The sweep: 21 densities &times; 48 forests = 1,008 runs. <span>Every tile is one task.</span></p>
+  <p class="t" id="tip" aria-hidden="true">the tipping point<small>near 59% trees</small></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, html, tok, EASE } = Anim;
+
+// ---- small helpers ----------------------------------------------------------------------------------------------------
+const f2 = v => +v.toFixed(2);
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => "#" + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+const pctText = p => Math.round(p) + "%";
+const $ = id => document.getElementById(id);
+const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+
+const DT = 36;                                  // ms per breadth-first step, in every playback
+const FRONT = 3, BURN = 9, ASH_FADE = 3;        // steps a cell stays yellow, then orange; steps it takes to go dark
+const LIFE = FRONT + BURN + ASH_FADE;
+
+const art = $("art");
+let C;                                          // literal colors for the animations, read from the tokens in setup
+
+// ---- a forest: the base layer is every tree; one overlay per burn step sits on top and changes color -----------------------
+function runsOf(cells, size) {                  // [col, row, length] for the cells that pass `keep`, merged along each row
+  return keep => {
+    const out = [];
+    for (let r = 0; r < size; r++) {
+      let c = 0;
+      while (c < size) {
+        if (!keep(cells[r * size + c])) { c++; continue; }
+        let e = c;
+        while (e + 1 < size && keep(cells[r * size + e + 1])) e++;
+        out.push([c, r, e - c + 1]);
+        c = e + 1;
+      }
+    }
+    return out;
+  };
+}
+const pathOf = (runs, cell) => runs.map(([c, r, n]) => `M${f2(c * cell)} ${f2(r * cell)}h${f2(n * cell)}v${f2(cell)}h${f2(-n * cell)}z`).join("");
+
+function buildForest(parent, run, cell, ox, oy) {
+  const size = run.size, cells = run.cells, side = size * cell;
+  const g = svg("g", { class: "forest" }, parent);
+  g.style.transform = `translate(${ox}px, ${oy}px)`;
+  svg("rect", { class: "f-ground", width: side, height: side }, g);
+  svg("path", { class: "f-tree", d: pathOf(runsOf(cells, size)(v => v !== -2), cell) }, g);
+  const steps = [];
+  const byStep = new Map();                      // burn step -> the cells (row-major indexes) that burn then
+  cells.forEach((v, i) => { if (v >= 0) { if (!byStep.has(v)) byStep.set(v, []); byStep.get(v).push(i); } });
+  const cum = [];                                // trees burned by the end of step k
+  let total = 0;
+  for (let k = 0; k <= run.steps; k++) {
+    const idx = byStep.get(k) || [];
+    total += idx.length;
+    cum.push(total);
+    if (!idx.length) continue;
+    const merged = [];                           // runs of neighbours along a row
+    for (const i of idx.sort((a, b) => a - b)) {
+      const r = Math.floor(i / size), c = i % size, last = merged[merged.length - 1];
+      if (last && last[1] === r && last[0] + last[2] === c) last[2]++; else merged.push([c, r, 1]);
+    }
+    const path = svg("path", { d: pathOf(merged, cell) }, g);
+    path.style.fill = C.tree;
+    steps.push({ k, path });
+  }
+  svg("rect", { class: "f-frame", x: -2, y: -2, width: side + 4, height: side + 4 }, g);
+  const trees = cells.reduce((n, v) => n + (v !== -2), 0);
+  return { g, run, steps, cum, trees, burned: total, final: 100 * total / trees, side };
+}
+const startForest = f => f.steps.forEach(s => { s.path.style.fill = C.tree; });
+const endForest = f => f.steps.forEach(s => { s.path.style.fill = C.ash; });
+const pctAt = (f, k) => 100 * f.cum[Math.min(k, f.cum.length - 1)] / f.trees;
+
+// the color of a burning cell over its life: ignites yellow, burns orange, goes dark
+function lifeKeyframes() {
+  const t = s => s / LIFE;
+  return [
+    { fill: C.tree, offset: 0 }, { fill: C.hunt, offset: 0.01 }, { fill: C.hunt, offset: t(FRONT) },
+    { fill: C.flame, offset: t(FRONT + 1.5) }, { fill: C.flame, offset: t(FRONT + BURN) }, { fill: C.ash, offset: 1 },
+  ];
+}
+// play a forest: every step's cells change color in turn; returns the time the last cell has gone dark
+function burn(f, animate, later, lead, setPct) {
+  const kf = lifeKeyframes();
+  for (const s of f.steps) animate(s.path, kf, { duration: LIFE * DT, delay: lead + s.k * DT, easing: EASE.linear });
+  let last = -1;
+  for (let k = 0; k <= f.run.steps; k++) {
+    const p = Math.round(pctAt(f, k));
+    if (p !== last) { last = p; const v = p; later(lead + k * DT + 10, () => setPct(v)); }
+  }
+  return lead + (f.run.steps + LIFE) * DT;
+}
+
+// ---- setup: runs the page's drawing from the data ---------------------------------------------------------------------------
+let big, trio = [], mosaic = [], dots = [], sweepInfo, plot = {};
+const GEO = {};
+
+function setup(ctx, [fireRuns, sweep]) {
+  C = { tree: tok("--tree"), hunt: tok("--hunt"), flame: tok("--flame"), ash: tok("--ash"), ground: tok("--ground"), red: tok("--red") };
+  const runs = fireRuns.runs.map(r => Object.assign({ size: fireRuns.size }, r));
+  const sixty = runs.reduce((a, r) => (Math.abs(r.density - 0.6) < Math.abs(a.density - 0.6) ? r : a));
+
+  // beats 0 and 1: one forest, drawn large
+  GEO.bigCell = 7.5;
+  big = buildForest(art, sixty, GEO.bigCell, 152, 120);
+  big.g.style.opacity = 0;
+  big.label = Math.round(sixty.density * 100);
+  $("label0").innerHTML = `<span>One run:</span><br>a random forest,<br>${big.label}% trees`;
+
+  // beat 2: the three forests side by side, same seed
+  GEO.trioCell = 5.5;
+  const side = 64 * GEO.trioCell, gap = (1176 - 3 * side) / 2;               // 52 px from each edge, so the frames stay inside the 48 px margin
+  runs.slice(0, 3).forEach((r, i) => {
+    const x = 52 + i * (side + gap), y = 178;
+    const f = buildForest(art, r, GEO.trioCell, x, y);
+    f.g.style.opacity = 0;
+    f.top = html("p", { class: "t flabel", html: `<b>${Math.round(r.density * 100)}%</b> <span>trees</span>`, style: { left: x + "px", top: (y - 46) + "px" } }, document.getElementById("stage"));
+    f.top.querySelector("b").style.fontWeight = 800;
+    f.count = html("p", { class: "t fcount", html: "burned: <b>0%</b>", style: { left: x + "px", top: (y + side + 16) + "px" } }, document.getElementById("stage"));
+    trio.push(f);
+  });
+
+  // beats 3 and 4: the sweep. A tile per run, in a column per density; later the same tile flies to its place on the curve.
+  const dens = sweep.densities, per = sweep.seeds_per_density;
+  const rows = {};                                // density -> burned fractions by seed
+  for (const [d, seed, fr] of sweep.results) (rows[d] ||= [])[seed] = fr;
+  GEO.colPitch = 46; GEO.tileW = 42; GEO.rowPitch = 9; GEO.tileH = 7;
+  GEO.fx0 = (1280 - (dens.length * GEO.colPitch - (GEO.colPitch - GEO.tileW))) / 2 + 16;   // a little right of center: the plot's axis labels sit at its left
+  GEO.fy0 = 124; GEO.fh = per * GEO.rowPitch - (GEO.rowPitch - GEO.tileH);
+  GEO.fw = dens.length * GEO.colPitch - (GEO.colPitch - GEO.tileW);
+  GEO.colX = i => GEO.fx0 + GEO.tileW / 2 + i * GEO.colPitch;
+  GEO.yOf = fr => GEO.fy0 + GEO.fh - 8 - fr * (GEO.fh - 16);
+
+  // the plot's frame: gridlines and labels (beat 4), under the dots
+  plot.g = svg("g", {}, art); plot.g.style.opacity = 0;
+  plot.grid = [0, 0.5, 1].map(v => svg("line", { class: "grid" + (v === 0 ? " base" : ""), x1: GEO.fx0 - 12, x2: GEO.fx0 + GEO.fw + 12, y1: GEO.yOf(v), y2: GEO.yOf(v) }, plot.g));
+  plot.ylab = [["0%", 0], ["50%", 0.5], ["100%", 1]].map(([t, v]) => svg("text", { class: "tick-l", x: GEO.fx0 - 24, y: GEO.yOf(v), dy: "0.35em", "text-anchor": "end", text: t }, plot.g));
+  plot.yt = svg("text", { class: "axis-t", x: 78, y: GEO.fy0 + GEO.fh / 2, "text-anchor": "middle", transform: `rotate(-90 78 ${GEO.fy0 + GEO.fh / 2})`, text: "fraction of trees burned" }, plot.g);
+  plot.xt = svg("text", { class: "axis-t", x: 640, y: 640, "text-anchor": "middle", text: "tree density" }, plot.g);
+  plot.bandX = [GEO.colX(8.5), GEO.colX(10.5)];
+  plot.band = svg("rect", { class: "band", x: plot.bandX[0], y: GEO.fy0 - 6, width: plot.bandX[1] - plot.bandX[0], height: GEO.fh + 12, rx: 14 }, art);
+
+  // the density ticks, shared by the mosaic and the plot
+  plot.xticks = svg("g", {}, art); plot.xticks.style.opacity = 0;
+  dens.forEach((d, i) => { if (i % 5 === 0) svg("text", { class: "tick-l", x: GEO.colX(i), y: GEO.fy0 + GEO.fh + 38, "text-anchor": "middle", text: Math.round(d * 100) + "%" }, plot.xticks); });
+
+  const gTiles = svg("g", {}, art), gDots = svg("g", {}, art);
+  dens.forEach((d, i) => {
+    for (let j = 0; j < per; j++) {
+      const fr = rows[d][j], col = mix(C.tree, C.ash, fr);
+      const cx = GEO.colX(i), cy = GEO.fy0 + GEO.tileH / 2 + j * GEO.rowPitch;
+      const jit = (((j * 0.6180339887 + i * 0.4142135623) % 1) - 0.5) * 26;
+      const tile = svg("rect", { class: "tile fb", x: cx - GEO.tileW / 2, y: cy - GEO.tileH / 2, width: GEO.tileW, height: GEO.tileH, rx: 2.5 }, gTiles);
+      tile.style.fill = col;
+      const px = cx + jit, py = GEO.yOf(fr);
+      const dot = svg("circle", { class: "dot", cx: px, cy: py, r: 5.5 }, gDots);
+      dot.style.fill = col;
+      const rec = { tile, dot, i, j, fr, cx, cy, px, py };
+      rec.fly = `translate(${f2(px - cx)}px, ${f2(py - cy)}px) scale(${f2(11 / GEO.tileW)}, ${f2(11 / GEO.tileH)})`;
+      mosaic.push(rec);
+    }
+  });
+
+  // the mean line through the 21 means
+  const means = dens.map(d => rows[d].reduce((a, v) => a + v, 0) / rows[d].length);
+  const pts = means.map((m, i) => ({ x: GEO.colX(i), y: GEO.yOf(m) }));
+  const d = monotone(pts);
+  plot.halo = svg("path", { class: "mean-halo", d }, art);
+  plot.mean = svg("path", { class: "mean", d }, art);
+  plot.len = plot.mean.getTotalLength();
+  for (const p of [plot.halo, plot.mean]) p.style.strokeDasharray = plot.len;
+  plot.arrow = svg("path", { class: "arrow", d: `M${plot.bandX[0] - 62} 238 H${plot.bandX[0] - 14} M${plot.bandX[0] - 30} 222 L${plot.bandX[0] - 12} 238 L${plot.bandX[0] - 30} 254` }, art);
+  $("tip").style.right = (1280 - (plot.bandX[0] - 82)) + "px";
+  sweepInfo = { total: sweep.results.length, dens: dens.length, per };
+}
+
+// a smooth curve through the points that never overshoots them (a monotone cubic)
+function monotone(p) {
+  const n = p.length, dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = p[i + 1].x - p[i].x; m[i] = (p[i + 1].y - p[i].y) / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]);
+  let d = `M${f2(p[0].x)} ${f2(p[0].y)}`;
+  for (let i = 0; i < n - 1; i++) d += `C${f2(p[i].x + dx[i] / 3)} ${f2(p[i].y + (t[i] * dx[i]) / 3)} ${f2(p[i + 1].x - dx[i] / 3)} ${f2(p[i + 1].y - (t[i + 1] * dx[i]) / 3)} ${f2(p[i + 1].x)} ${f2(p[i + 1].y)}`;
+  return d;
+}
+
+// ---- states -------------------------------------------------------------------------------------------------------------------
+const counterB = () => $("counter1").querySelector("b");
+function setTrio(i, p) { trio[i].count.innerHTML = `burned: <b>${pctText(p)}</b>`; }
+
+defineAnimation({
+  beats: 4,
+  alt: [
+    "One run: a random forest, 60% trees. A square forest, 64 cells across, green trees on bare ground. A legend gives the colors: tree, bare ground, fire front, burning, burnt.",
+    "The fire starts in every tree on the left edge and spreads one step at a time to the four neighbors. The front is yellow, burning trees orange and burnt cells dark. The counter climbs to burned: 56%.",
+    "Three forests with the same seed, at 45%, 60% and 75% trees, burn together. The sparse one dies out at 8% burned. The 60% one creeps through along a branching path to 56%. The 75% one sweeps across to 99%.",
+    "The sweep: 21 densities times 48 forests is 1,008 runs. Every tile is one task. One column per density, from 40% to 80% trees, one tile per forest, colored from green (survived) to dark (burned). The columns flip from green to dark near 59%.",
+    "The tiles become dots on a plot of the fraction of trees burned against tree density, with a red mean line. The curve stays near zero, rises steeply near 59% trees, the tipping point, and levels off near 100%.",
+  ],
+
+  load: () => Promise.all([Anim.loadJSON("data/fire-runs.json"), Anim.loadJSON("data/sweep.json")]),
+  setup,
+
+  render(n) {
+    // one forest
+    big.g.style.opacity = n <= 1 ? 1 : 0;
+    (n >= 1 ? endForest : startForest)(big);
+    op($("label0"), n <= 1 ? 1 : 0);
+    op($("counter1"), n === 1 ? 1 : 0);
+    counterB().textContent = n >= 1 ? pctText(big.final) : "0%";
+    op($("legend"), n <= 2 ? 1 : 0);
+    // three forests
+    trio.forEach((f, i) => {
+      f.g.style.opacity = n === 2 ? 1 : 0;
+      (n === 2 ? endForest : startForest)(f);
+      op(f.top, n === 2 ? 1 : 0);
+      op(f.count, n === 2 ? 1 : 0);
+      setTrio(i, n === 2 ? f.final : 0);
+    });
+    // the sweep
+    for (const r of mosaic) {
+      r.tile.style.opacity = n === 3 ? 1 : 0; r.tile.style.transform = "";
+      r.dot.style.opacity = n === 4 ? 0.5 : 0;
+    }
+    op($("caption3"), n === 3 ? 1 : 0);
+    op(plot.xticks, n >= 3 ? 1 : 0);
+    op(plot.g, n === 4 ? 1 : 0);
+    op(plot.band, n === 4 ? 0.28 : 0);
+    for (const p of [plot.halo, plot.mean]) { p.style.strokeDashoffset = 0; p.style.opacity = n === 4 ? (p === plot.halo ? 0.85 : 1) : 0; }
+    op(plot.arrow, n === 4 ? 1 : 0);
+    op($("tip"), n === 4 ? 1 : 0);
+  },
+
+  enter(n, { animate, later }) {
+    const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+    const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+
+    if (n === 1) {
+      startForest(big);
+      animate($("counter1"), rise(12), { duration: 500 });
+      const end = burn(big, animate, later, 400, p => { counterB().textContent = pctText(p); });
+      counterB().textContent = "0%";
+    }
+
+    if (n === 2) {
+      animate(big.g, fade(1, 0), { duration: 450 });
+      for (const id of ["label0", "counter1"]) animate($(id), fade(1, 0), { duration: 400 });
+      trio.forEach((f, i) => {
+        startForest(f);
+        setTrio(i, 0);
+        animate(f.g, fade(0, 1), { duration: 600, delay: 250 });
+        animate(f.top, rise(10), { duration: 500, delay: 450 });
+        animate(f.count, rise(10), { duration: 500, delay: 450 });
+        burn(f, animate, later, 850, p => setTrio(i, p));
+      });
+    }
+
+    if (n === 3) {
+      for (const f of trio) { animate(f.g, fade(1, 0), { duration: 450 }); animate(f.top, fade(1, 0), { duration: 400 }); animate(f.count, fade(1, 0), { duration: 400 }); }
+      animate($("legend"), fade(1, 0), { duration: 400 });
+      animate(plot.xticks, fade(0, 1), { duration: 600, delay: 600 });
+      // the tiles arrive column by column, each column filling from the top
+      for (const r of mosaic) animate(r.tile, [{ opacity: 0, transform: "scale(0.35)" }, { opacity: 1, transform: "scale(1)" }], { duration: 320, delay: 500 + r.i * 62 + r.j * 4, easing: EASE.out });
+      animate($("caption3"), rise(12), { duration: 600, delay: 500 + 20 * 62 + 47 * 4 + 400 });
+    }
+
+    if (n === 4) {
+      animate($("caption3"), fade(1, 0), { duration: 350 });
+      animate(plot.g, fade(0, 1), { duration: 700, delay: 250 });
+      // each tile flies to its place on the curve (fraction burned up, a little jitter sideways) and becomes a dot
+      for (const r of mosaic) {
+        const d = r.i * 22 + (r.j % 7) * 10;
+        animate(r.tile, [{ opacity: 1, transform: "none" }, { opacity: 1, transform: r.fly, offset: 0.78 }, { opacity: 0, transform: r.fly }], { duration: 1100, delay: 200 + d, easing: EASE.inOut });
+        animate(r.dot, [{ opacity: 0 }, { opacity: 0, offset: 0.78 }, { opacity: 0.5 }], { duration: 1100, delay: 200 + d, easing: EASE.inOut });
+      }
+      const t = 1900;
+      animate(plot.halo, [{ strokeDashoffset: plot.len, opacity: 0.85 }, { strokeDashoffset: 0, opacity: 0.85 }], { duration: 1300, delay: t, easing: EASE.inOut });
+      animate(plot.mean, [{ strokeDashoffset: plot.len, opacity: 1 }, { strokeDashoffset: 0, opacity: 1 }], { duration: 1300, delay: t, easing: EASE.inOut });
+      animate(plot.band, fade(0, 0.28), { duration: 600, delay: t + 1300 });
+      animate(plot.arrow, rise(0), { duration: 500, delay: t + 1700 });
+      animate($("tip"), rise(10), { duration: 600, delay: t + 1700 });
+    }
+  },
+});
+</script>
+</body>
+</html>

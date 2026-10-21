@@ -1,0 +1,131 @@
+/*-- scss:defaults --*/
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap");
+
+$ncsu-red: #CC0000;
+$ncsu-red-dark: #990000;
+$ncsu-black: #000000;
+$ncsu-dk-gray: #3D3D3D;
+$ncsu-md-gray: #6D6E71;
+$ncsu-lt-gray: #E6E6E6;
+$paper: #FAF8F5;
+
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+$font-family-monospace: "JetBrains Mono", Menlo, Consolas, monospace;
+$headings-font-weight: 800;
+$body-color: $ncsu-dk-gray;
+$link-color: $ncsu-red;
+$primary: $ncsu-red;
+$code-color: $ncsu-red-dark;
+$navbar-bg: $ncsu-red;
+$footer-bg: #F4F4F4;
+
+/*-- scss:rules --*/
+body { font-feature-settings: "ss01", "cv11"; }
+
+h1, h2, h3 { letter-spacing: -0.01em; color: #1A1A1A; }
+h2 { border-bottom: 4px solid $ncsu-red; padding-bottom: 0.25rem; margin-top: 2.4rem; }
+h3 { margin-top: 1.8rem; }
+
+.navbar-brand img { max-height: 30px; max-width: 55vw; width: auto; height: auto; }
+// Long paths in table cells, like ~/.claude/projects/<project>/memory/, may break rather than push the page wide.
+td code { overflow-wrap: anywhere; }
+.navbar .navbar-title { font-weight: 700; }
+
+// Hero on the home page
+.hero {
+  background: #1A1A1A;
+  color: #FFF;
+  border-radius: 14px;
+  padding: 2.2rem 2.2rem 1.8rem;
+  margin: 0.5rem 0 1.8rem;
+  border-left: 10px solid $ncsu-red;
+  h1, .h1 { color: #FFF; margin: 0 0 0.3rem; font-size: 2.4rem; border: 0; }
+  p { color: #E8E8E8; margin: 0.35rem 0; }
+  .when { font-weight: 700; color: #FFF; }
+  a { color: #FFB3B3; }
+}
+
+// Cards grid
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+.card-link {
+  display: block; border: 1px solid $ncsu-lt-gray; border-top: 5px solid $ncsu-red; border-radius: 10px;
+  padding: 1rem 1.1rem; text-decoration: none; color: $ncsu-dk-gray; background: #FFF;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  &:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.10); transform: translateY(-2px); color: $ncsu-dk-gray; }
+  .card-title { display: block; font-weight: 800; font-size: 1.1rem; color: #1A1A1A; margin-bottom: 0.25rem; }
+  .card-text { display: block; font-size: 0.95rem; }
+}
+
+// "You type" prompt blocks: a fenced div .prompt around a code block
+.prompt {
+  position: relative; margin: 1rem 0 1.2rem;
+  &::before {
+    content: "You type"; position: absolute; top: -0.7rem; left: 0.9rem; z-index: 2;
+    background: $ncsu-red; color: #FFF; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 0.1rem 0.5rem; border-radius: 4px;
+  }
+  div.sourceCode, pre { background: #111 !important; border-radius: 10px; border: 0; }
+  pre code, pre { color: #F5F5F5 !important; font-size: 0.95rem; }
+  pre { padding: 1.1rem 2.6rem 0.9rem 1rem; }
+  // Prompts are sentences people read and copy: wrap them, and keep them one light color on the dark box.
+  pre, pre code, pre code > span { white-space: pre-wrap !important; word-break: break-word; overflow-x: visible !important; }
+  pre code span, pre code span * { color: #F5F5F5 !important; font-style: normal !important; font-weight: 400 !important; }
+  .code-copy-button, .code-copy-button > .bi { color: #DDD !important; }
+}
+.cards > p { display: contents; }
+.prompt.prompt-shell::before { content: "In your terminal"; background: #444; }
+
+// A note from someone the attendee works for: the rule Claude can't see
+.note-card {
+  background: #FFF8D6; border: 1px solid #E8D68A; border-radius: 6px; padding: 1.1rem 1.3rem 0.9rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08); transform: rotate(-0.4deg); margin: 1.2rem 0 1.5rem;
+  font-size: 1.02rem;
+  .note-from { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #7A6400; }
+}
+
+// Big number answer key
+.answer {
+  display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+  border: 2px solid $ncsu-red; border-radius: 12px; padding: 0.8rem 1.2rem; margin: 1rem 0;
+  .answer-label { font-weight: 700; color: $ncsu-md-gray; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+  .answer-value { font-size: 2.2rem; font-weight: 800; color: $ncsu-red; font-variant-numeric: tabular-nums; }
+}
+
+// What to watch for
+.watch { border-left: 5px solid #1A1A1A; background: #F6F6F6; padding: 0.7rem 1rem; border-radius: 0 8px 8px 0; margin: 0.8rem 0 1.2rem; }
+.watch > p:first-child::before { content: "Watch for: "; font-weight: 800; color: #1A1A1A; }
+
+// Finish line checklist
+.finish-line {
+  border: 1px solid $ncsu-lt-gray; border-radius: 12px; padding: 0.6rem 1.2rem 0.4rem; background: #FFF;
+  ul { list-style: none; padding-left: 0; }
+  li { padding: 0.35rem 0; border-bottom: 1px dashed $ncsu-lt-gray; }
+  li:last-child { border-bottom: 0; }
+  input[type=checkbox] { transform: scale(1.25); margin-right: 0.6rem; accent-color: $ncsu-red; }
+}
+
+.step-badge {
+  display: inline-block; background: $ncsu-red; color: #FFF; font-weight: 800; border-radius: 999px;
+  padding: 0.05rem 0.65rem; margin-right: 0.4rem; font-size: 0.85em; vertical-align: 0.1em;
+}
+
+.shot { border: 1px solid $ncsu-lt-gray; border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,0.10); }
+.small-muted { color: $ncsu-md-gray; font-size: 0.9rem; }
+
+kbd {
+  background: #FFF; color: #1A1A1A; border: 1px solid #BBB; border-bottom-width: 3px; border-radius: 5px;
+  padding: 0.05rem 0.4rem; font-family: $font-family-sans-serif; font-weight: 600; font-size: 0.85em;
+}
+
+table { font-size: 0.95rem; }
+.table thead th { border-bottom: 2px solid $ncsu-red; }
+
+@media print {
+  .navbar, #quarto-sidebar, .nav-footer, #TOC, .code-copy-button { display: none !important; }
+  .prompt div.sourceCode, .prompt pre { background: #FFF !important; border: 1px solid #999; }
+  .prompt pre code { color: #000 !important; }
+}
+
+// Code fonts draw != <= >= == as single glyphs (ligatures). Beginners copy what they see and type ≠, which Python
+// rejects, so show every character as typed.
+code, pre, kbd, samp, .sourceCode { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }

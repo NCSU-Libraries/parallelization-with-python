@@ -1,0 +1,171 @@
+---
+title: "Parallelization with Python"
+subtitle: "Data Science Special Topics · NC State University Libraries"
+from: markdown-smart
+format:
+  revealjs:
+    theme: [default, ../theme/ncsu.scss, ../theme/slides.scss]
+    width: 1280
+    height: 720
+    margin: 0.06
+    slide-number: true
+    hash-type: number
+    transition: fade
+    background-transition: fade
+    preview-links: false
+    footer: "Data Science Services · ncsu-libraries.github.io/parallelization-with-python"
+    logo: ../images/lib_logo_whiteBG.png
+    include-after-body:
+      text: |
+        <script src="anim/_shared/deck-sync.js"></script>
+---
+
+## While we get started
+
+::: {.two-col}
+::: {}
+[Open the materials]{.eyebrow}
+
+[{{< var go >}}]{.statement}
+:::
+
+::: {style="text-align:center;padding-top:30px"}
+![](../images/qr-session.svg){.qr .qr-big fig-alt="QR code for the workshop materials page, ncsu-libraries.github.io/parallelization-with-python"}
+:::
+:::
+
+## Data Science Services {.dss background-image="../images/dss/dss-services.png" background-size="contain" background-color="#FFFFFF" data-state="dss-slide"}
+
+[Our services: consulting, workshops and instruction, specialized spaces. What we do: finding data, wrangling data, analyzing data, visualization, geographic information systems (GIS), software access.]{.visually-hidden}
+
+## Who we are {.dss .dss-team .nostretch data-state="dss-slide"}
+
+![](../images/dss/dss-team.png){fig-alt="Data Science Services, who we are: Mara Blake, Head, Data Science Services; Shannon Ricci, Associate Head, Data Science Services; Jeff Essic, Lead Librarian for GIS; Alp Tezbasaran, Data Science Librarian; Selene Schmittling, Data Science Librarian; Bin Liu, Data Science Librarian; Ashley Pearson, University Library Specialist"}
+
+Our team comes from a variety of academic backgrounds, including nuclear engineering, electrical engineering, industrial and environmental engineering, marine ecology, information science, natural resources, business administration, and geographic information sciences.
+
+## How to contact us {.dss background-image="../images/dss/dss-contact.png" background-size="contain" background-color="#FFFFFF" data-state="dss-slide"}
+
+[How to contact us: go.ncsu.edu/getdatahelp. Email us, book a 30-minute appointment with a Data Science Consultant, or reserve a workstation in the DXL or Dataspace. All communication with the program is through getdatahelp@ncsu.edu.]{.visually-hidden}
+
+## Today's finish line
+
+<ul class="finish" style="font-size:0.62em;line-height:1.4">
+<li>Learn the types of parallelization and where your own work fits</li>
+<li>Spread an "embarrassingly parallel" task across cores with Python's <code>multiprocessing</code></li>
+<li>Time it across core counts to see where the gains level off</li>
+<li>See a case where parallel is slower, and why</li>
+</ul>
+
+# Welcome and the main idea {.divider background-color="#CC0000"}
+
+## Fourteen cores {#anim-cores background-iframe="anim/cores.html" background-interactive="true"}
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+[Text alternative: a processor with 14 cores, 10 large performance cores and 4 smaller efficiency cores, all idle. A loop, for forest in forests: burn(forest), starts running and exactly one core lights up: 1 of 14 cores busy, 7%. The other 13 cores wait. Then all 14 cores light up: 14 of 14 busy, 100%. This workshop: how to use the rest. Finally a small card shows Google Colab with 2 cores.]{.visually-hidden}
+
+# The landscape {.divider background-color="#CC0000"}
+
+## Reading the lanes {#anim-lanes-primer background-iframe="anim/lanes-primer.html" background-interactive="true"}
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+[Text alternative: lanes, one lane per worker, time running left to right, one red block per task, gray for overhead and a vertical line for the finish. Twelve tasks run one after another on one worker and finish at 12 units. Dealt out to four workers they finish at 3 units, 4 times faster. With a gray overhead sliver before every task they finish at about 3.6 units, 3.4 times faster: handing out work isn't free.]{.visually-hidden}
+
+## Kinds of parallel work {#anim-kinds}
+
+_Animation A3 goes here._
+
+## Waiting versus computing {#anim-waiting}
+
+_Animation A4 goes here._
+
+## Where parallelism lives {#anim-where}
+
+_Animation A5 goes here._
+
+## Which tool fits your work? {#decision-map}
+
+_Decision map A6 goes here._
+
+# How multiprocessing works {.divider background-color="#CC0000"}
+
+## Processes and parcels {#anim-processes}
+
+_Animation A7 goes here._
+
+## pool.map, step by step {#anim-pool-map}
+
+_Animation A8 goes here._
+
+# Demo 1: spread it across cores {.divider background-color="#CC0000"}
+
+## One task, then a thousand {#anim-fire background-iframe="anim/fire.html" background-interactive="true"}
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+[Text alternative: one random forest, 60% trees, drawn as green trees on bare ground. A fire starts on the left edge and spreads step by step, and the counter ends at burned: 56%. Three forests at 45%, 60% and 75% trees burn together: 8%, 56% and 99% burned. The sweep is 21 densities times 48 forests, 1,008 runs, drawn as a mosaic with one tile per run. A plot of the fraction burned against tree density rises steeply near 59% trees: the tipping point.]{.visually-hidden}
+
+## Replaying the real run {#anim-replay}
+
+_Animation A10 goes here._
+
+# Demo 2: where the gains level off {.divider background-color="#CC0000"}
+
+## Speedup by core count {#anim-scaling}
+
+_Animation A11 goes here._
+
+## Your ceiling and mine {#anim-ceilings}
+
+_Animation A13 goes here._
+
+# Demo 3: slower than not {.divider background-color="#CC0000"}
+
+## When parallel is slower {#anim-overhead}
+
+_Animation A12 goes here._
+
+# Your own work {.divider background-color="#CC0000"}
+
+## The tool ladder {#tool-ladder}
+
+_Figure A14 goes here._
+
+# Questions {.divider background-color="#CC0000"}
+
+## Tell us how we did
+
+::: {style="text-align:center"}
+[go.ncsu.edu/dss-workshop-eval](https://go.ncsu.edu/dss-workshop-eval){style="font-size:1.5em;font-weight:800"}
+
+![](../images/dss/qr-eval.png){.qr .qr-big fig-alt="QR code for the workshop evaluation, go.ncsu.edu/dss-workshop-eval"}
+:::

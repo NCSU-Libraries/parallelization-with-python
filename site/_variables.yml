@@ -1,0 +1,19 @@
+# One place for facts that appear on several pages and in the deck.
+
+event:
+  title: "Parallelization with Python"
+  series: "Data Science Special Topics"
+  date: "Tuesday, October 27, 2026"
+  time: "6:00–7:30 pm"
+  where: "Online (Zoom)"
+  page: "https://www.lib.ncsu.edu/workshops/data-science-special-topics-parallelization-python/2026-10-27"
+
+site: "https://ncsu-libraries.github.io/parallelization-with-python/"
+site-short: "ncsu-libraries.github.io/parallelization-with-python"
+# TODO: Alp will make a go link later (for example go.ncsu.edu/dss-parallel). Until then, use the site address.
+go: "ncsu-libraries.github.io/parallelization-with-python"
+repo: "https://github.com/NCSU-Libraries/parallelization-with-python"
+help: "https://go.ncsu.edu/getdatahelp"
+email: "lib-datascienceservices@ncsu.edu"
+eval: "https://go.ncsu.edu/dss-workshop-eval"
+workshops: "https://go.ncsu.edu/datavizworkshops"   # every DSS workshop, with dates

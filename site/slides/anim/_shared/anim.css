@@ -1,0 +1,129 @@
+/*
+ * Shared styles for the animation pages (site/slides/anim/*.html).
+ *
+ * Pages use the tokens below (var(--red), ...) and never hard-code a color.
+ * The 1280x720 stage is placed and scaled by anim.js; everything here is in stage pixels.
+ */
+
+/* Inter and JetBrains Mono: the same URLs the deck theme loads, so the browser reuses its cache. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap");
+
+:root {
+  /* NC State palette: the roles are fixed in CLAUDE.md > Animations > Palette */
+  --red: #CC0000;        /* Wolfpack Red: work, active cores */
+  --red-deep: #990000;   /* Reynolds Red: the darker red */
+  --ink: #1F2328;        /* text */
+  --muted: #57606A;      /* secondary text */
+  --overhead: #9AA0A6;   /* overhead, waiting */
+  --idle: #EEF0F2;       /* idle track, dim core */
+  --tree: #6F7D1C;       /* Genomic Green */
+  --flame: #D14905;      /* Pyroman Flame */
+  --hunt: #FAC800;       /* Hunt Yellow, the fire front */
+  --ash: #3A3A3A;
+  --ground: #F3EEE4;     /* bare ground */
+
+  /* Supporting neutrals for drawing. They are not roles. */
+  --paper: #FFFFFF;
+  --line: #D5DADF;       /* outline of an idle shape */
+  --red-soft: #FFB4B4;   /* red tint that reads on a dark card */
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+}
+
+/* In the deck the page sits on the slide background, so it paints none of its own. */
+html.in-deck, html.in-deck body { background: transparent; }
+
+/* The stage: a fixed 1280x720 design space. anim.js sets its transform. */
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 720px;
+  transform-origin: 0 0;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+.stage > svg, .stage .art {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 720px;
+  overflow: visible;
+}
+.stage svg text { font-family: var(--font); }
+
+/* The slide title: the same place and look as the deck's h2 (58px, 800, a red rule under it),
+   so animation slides read as part of the deck. */
+.stage .title {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 1280px;
+  margin: 0;
+  padding: 0 0 4px;
+  font: 800 58px/1.2 var(--font);
+  letter-spacing: 0.2px;
+  color: var(--ink);
+  border-bottom: 6px solid var(--red);
+}
+
+/* Shown instead of the drawing when a page cannot load its data. */
+.stage .load-error { position: absolute; left: 48px; top: 140px; width: 1000px; margin: 0; font: 600 28px/1.4 var(--font); color: var(--red); }
+
+/* Text kept for screen readers and for the "text alternative" of the page. */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* SVG helpers: scale or rotate a shape about its own box, not about the viewport origin. */
+.fb   { transform-box: fill-box; transform-origin: center; }
+.fb-l { transform-box: fill-box; transform-origin: left center; }
+.fb-t { transform-box: fill-box; transform-origin: center top; }
+.fb-b { transform-box: fill-box; transform-origin: center bottom; }
+
+/* ---- lanes (lanes.js) ---- */
+.lanes .track        { fill: var(--idle); }
+.lanes .lane-label   { font: 700 24px var(--font); fill: var(--ink); }
+.lanes .blk          { fill: var(--red); }
+.lanes .blk.overhead { fill: var(--overhead); }
+.lanes .blk-label    { font: 800 24px var(--font); fill: var(--paper); pointer-events: none; }
+.lanes .axis-line    { stroke: var(--overhead); stroke-width: 3; stroke-linecap: round; fill: none; }
+.lanes .tick         { stroke: var(--overhead); stroke-width: 3; stroke-linecap: round; }
+.lanes .tick-label   { font: 600 22px var(--font); fill: var(--muted); }
+.lanes .axis-title   { font: 600 22px var(--font); fill: var(--muted); }
+.lanes .finish-line  { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; fill: none; }
+.lanes .finish-ghost { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1 11; fill: none; }
+.lanes .finish-label { font: 800 28px var(--font); fill: var(--ink); }
+.lanes .finish-label.ghost { font: 700 24px var(--font); fill: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

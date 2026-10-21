@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Quarto build output and caches (the Pages workflow renders the site)
+/site/_site/
+/site/.quarto/
+**/*_files/
+/site/slides/*.html
+
+# Local scratch: screenshots, test runs, contact sheets
+/build/
+/tools/node_modules/
+__pycache__/
+.venv/
+
+# Instructor notes stay private: never part of this repository
+/instructor/

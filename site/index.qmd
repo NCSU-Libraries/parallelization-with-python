@@ -1,0 +1,24 @@
+---
+pagetitle: "Parallelization with Python"
+toc: false
+title-block-style: none
+---
+
+::: {.hero}
+<p class="small-muted" style="color:#BDBDBD;margin:0 0 .3rem">{{< var event.series >}} · NC State University Libraries</p>
+
+# Parallelization with Python
+
+<p class="when">{{< var event.date >}}, {{< var event.time >}} · {{< var event.where >}}</p>
+
+Use more of your computer's cores to get the same work done sooner.
+:::
+
+## What we'll do
+
+- Learn the types of parallelization and where your own work fits.
+- Spread an "embarrassingly parallel" task across cores with Python's `multiprocessing`.
+- Time it across core counts to see where the gains level off.
+- See a case where parallel is slower, and why.
+
+There's nothing to install: you'll use Google Colab. Follow along in the [slides](slides/index.qmd).

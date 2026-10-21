@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading the lanes</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A2: reading the lanes. Twelve tasks, one worker, four workers, and the cost of handing out work. */
+  .q-box   { fill: none; stroke: var(--overhead); stroke-width: 3; }
+  .q-label { position: absolute; left: 48px; top: 590px; width: 172px; margin: 0; font: 600 24px/1.2 var(--font); color: var(--muted); text-align: center; white-space: nowrap; opacity: 0; }
+
+  .legend { position: absolute; left: 48px; top: 628px; display: flex; gap: 56px; align-items: center; font: 600 24px/1 var(--font); color: var(--ink); white-space: nowrap; }
+  .legend span { display: flex; align-items: center; gap: 14px; }
+  .legend svg { display: block; width: 60px; height: 34px; overflow: visible; }
+  .legend em { font-style: normal; color: var(--muted); font-weight: 400; padding: 0 3px; }
+  .l-track { fill: var(--idle); }
+  .l-task  { fill: var(--red); }
+  .l-over  { fill: var(--overhead); }
+  .l-line  { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Reading the lanes</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+  <p class="q-label" id="qLabel" aria-hidden="true">task queue</p>
+
+  <div class="legend" aria-hidden="true">
+    <span><svg viewBox="0 0 60 34"><rect class="l-track" x="0" y="3" width="60" height="28" rx="14"/></svg>lane <em>=</em> worker</span>
+    <span><svg viewBox="0 0 60 34"><rect class="l-task" x="7" y="3" width="46" height="28" rx="9"/></svg>block <em>=</em> task</span>
+    <span><svg viewBox="0 0 60 34"><rect class="l-over" x="22" y="3" width="16" height="28" rx="5"/></svg>gray <em>=</em> overhead</span>
+    <span><svg viewBox="0 0 60 34"><line class="l-line" x1="30" y1="2" x2="30" y2="32"/></svg>line <em>=</em> finish</span>
+  </div>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script src="_shared/lanes.js"></script>
+<script>
+"use strict";
+const { svg, EASE } = Anim;
+
+// ---- the scene (stage pixels). Time is in abstract units: every task takes 1. ------------------------------------------
+const N = 12, WORKERS = 4, OH = 0.19;           // 12 tasks, 4 workers; a handoff costs 0.19 of a task, which makes 4 workers 3.4x faster
+const U = 70, X0 = 370;                          // pixels per unit, and where time 0 sits
+const TOP = 176, LANE_H = 80, GAP = 14;          // top of lane 0 when all four lanes show; lane height; space between lanes
+const BLOCK_H = LANE_H - 16, ROW = BLOCK_H + 4;  // block height; row pitch in the queue
+const art = document.getElementById("art");
+
+// the queue: two piles of six at the left, the right pile leaves first so that nothing slides over a waiting block
+const QX = [60, 138], QY = 153;                  // the queue is centered on the four-lane stack
+const qPos = i => ({ x: i < 6 ? QX[1] : QX[0], y: QY + (i % 6) * ROW });
+const qBox = svg("rect", { class: "q-box", x: 49.5, y: QY - 14, width: 169, height: 6 * ROW - 6 + 28, rx: 20 }, art);
+qBox.style.strokeDasharray = "13 10";
+qBox.style.opacity = 0;
+const qLabel = document.getElementById("qLabel");
+
+const view = Lanes.create({
+  parent: art, x: X0, y: TOP, width: U * 12, domain: [0, 12], lanes: WORKERS, laneH: LANE_H, gap: GAP, inset: 8,
+  blockGap: 3, overheadGap: 1, finLead: 36, labelLift: 12,
+  labels: i => "worker " + (i + 1), axis: { ticks: [0, 3, 6, 9, 12], title: "time \u2192" },
+  align: "center", show: 1, animate: (...a) => ctx.animate(...a),
+});
+
+// What is in the lanes at each beat
+function itemsFor(n) {
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    const task = { id: "t" + i, label: n === 0 ? null : String(i + 1), kind: "task" };   // numbered once it is in a lane
+    if (n === 0) Object.assign(task, { worker: 0, start: i, end: i + 1, pos: qPos(i) });                 // waiting in the queue
+    else if (n === 1) Object.assign(task, { worker: 0, start: i, end: i + 1 });                          // one worker, one after another
+    else {
+      const w = i % WORKERS, col = Math.floor(i / WORKERS);                                              // dealt out round-robin
+      if (n === 2) Object.assign(task, { worker: w, start: col, end: col + 1, col });
+      else {                                                                                             // a sliver of overhead before each task
+        const s = col * (1 + OH);
+        out.push({ id: "o" + i, kind: "overhead", worker: w, start: s, end: s + OH, col });
+        Object.assign(task, { worker: w, start: s + OH, end: s + OH + 1, col });
+      }
+    }
+    out.push(task);
+  }
+  return out;
+}
+
+const LABEL = {
+  one: "1 worker · 12 units",
+  four: "4 workers · 3 units · 4× faster",
+  over: "3.4×: handing out work isn't free",
+};
+const T_FOUR = 12 / WORKERS, T_OVER = (12 / WORKERS) * (1 + OH);    // 3 units; 3.57 units
+// the speedup in the last label is checked against the numbers: 12 / 3.57
+console.assert((12 / T_OVER).toFixed(1) === "3.4", "overhead label out of step with the numbers");
+
+let ctx;                                       // set by setup, so the view animates through the engine
+
+function drawFinish(n) {                       // the finish lines that stand at the end of beat n
+  view.clearFinish();
+  if (n >= 1) view.finish(12, LABEL.one, { side: "end", ghostLabel: "12 units" });
+  if (n >= 2) view.finish(T_FOUR, LABEL.four, { side: "start" });
+  if (n >= 3) view.moveFinish(T_OVER, LABEL.over);
+}
+
+defineAnimation({
+  beats: 3,
+  alt: [
+    "Twelve identical red task blocks wait in a queue at the left. To their right is one empty lane, worker 1, with a time axis. The legend along the bottom reads: lane equals worker, block equals task, gray equals overhead, line equals finish.",
+    "The twelve tasks slide into worker 1's lane one after another. The finish line drops at 12 units: 1 worker, 12 units.",
+    "Three more lanes appear and the tasks are dealt out round-robin to four workers. A new finish line lands at 3 units: 4 workers, 3 units, 4 times faster. The old 12-unit line stays as a faint ghost.",
+    "A gray overhead sliver now comes before every task, and the finish line slides right to about 3.6 units: 3.4 times faster, not 4. Handing out work isn't free.",
+  ],
+
+  setup(c) { ctx = c; },
+
+  render(n) {
+    view.showLanes(n >= 2 ? WORKERS : 1);
+    view.set(itemsFor(n));
+    drawFinish(n);
+    qBox.style.opacity = qLabel.style.opacity = n === 0 ? 1 : 0;
+    qLabel.style.transform = "";
+  },
+
+  enter(n, { animate }) {
+    if (n === 1) {
+      const step = 330, fly = 680, last = (N - 1) * step + fly;
+      // each block hops over the lane: its peak is 90 px above the higher end, and never above the title
+      view.set(itemsFor(1), { animate: true, duration: fly, stagger: step, ease: EASE.inOut, arc: (a, b) => Math.max(100, Math.min(a.y, b.y) - 90) });
+      animate(qBox, [{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: last - 150 });
+      animate(qLabel, [{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: last - 150 });
+      view.finish(12, LABEL.one, { side: "end", ghostLabel: "12 units", animate: true, delay: last + 80 });
+    }
+    if (n === 2) {
+      view.showLanes(WORKERS, { animate: true, duration: 700 });
+      const base = 250, step = 45, move = 700, last = base + (N - 1) * step + move;
+      view.set(itemsFor(2), { animate: true, duration: move, stagger: step, delay: base, ease: EASE.inOut });
+      view.finish(T_FOUR, LABEL.four, { side: "start", animate: true, delay: last + 40 });
+    }
+    if (n === 3) {
+      // every task slides right at once, by the overhead in front of it; the slivers grow into the gaps, left to right
+      const grow = 1000, col = 220;
+      view.set(itemsFor(3), { animate: true, duration: grow, delayOf: it => (it.kind === "overhead" ? 150 + it.col * col : 0), ease: EASE.inOut });
+      view.moveFinish(T_OVER, LABEL.over, { animate: true, delay: 0, duration: grow });
+    }
+  },
+});
+</script>
+</body>
+</html>
