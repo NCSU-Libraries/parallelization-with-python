@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Question 1: What do you split?</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A3a: question 1, what do you split? One problem, the forest fire of data/fire-runs.json, cut four ways.
+     Beat 0 shows the four answers as gray labels. Beats 1 to 4 take one answer each, and the label of the one on show
+     turns red. Beat 5 puts all four small in a 2 x 2 grid. Each worker has a badge (W1, W2, ...) on its outline.
+     The numbers on screen come from the data: the tree counts of the bands, the burned fractions, the sweep size. */
+  .pill { position: absolute; left: 0; top: 0; width: 272px; height: 44px; margin: 0; border-radius: 22px; background: var(--idle); color: var(--muted); font: 700 28px/44px var(--font); text-align: center; white-space: nowrap; }
+  .t    { position: absolute; margin: 0; opacity: 0; white-space: nowrap; }
+
+  .f-ground { fill: var(--ground); }
+  .f-tree   { fill: var(--tree); }
+  .forest path, .forest rect { shape-rendering: crispEdges; }      /* cells meet edge to edge: no antialiased seams */
+  .f-line   { fill: none; stroke: var(--line); stroke-width: 3; }
+  .frame    { fill: none; stroke: var(--ink); stroke-width: 5; }   /* a worker's outline */
+  .frame.mid  { stroke-width: 4; }
+  .frame.thin { stroke-width: 3; }
+  .badge-bg { fill: var(--ink); stroke: var(--paper); stroke-width: 3; }
+  .badge-t  { font: 800 22px var(--font); fill: var(--paper); text-anchor: middle; }
+  .box-t    { font: 800 26px var(--font); fill: var(--ink); text-anchor: middle; }
+  .res-bg   { fill: var(--idle); }
+  .res-t    { font: 800 28px var(--font); fill: var(--ink); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .card     { fill: none; stroke: var(--line); stroke-width: 4; }
+  .card.on  { stroke: var(--red); stroke-width: 6; }
+  .a-halo   { stroke: var(--paper); fill: var(--paper); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+  .a-ink    { stroke: var(--ink); fill: var(--ink); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+  .key-t    { font: 600 26px var(--font); fill: var(--ink); }
+  .key-t.b  { font-weight: 800; }
+
+  .dens  { font: 800 30px/1.1 var(--font); color: var(--ink); text-align: center; width: 320px; }
+  .dens span { font-weight: 600; color: var(--muted); }
+  .chip  { font: 800 32px/1.1 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .chip span { font: 600 24px var(--font); color: var(--muted); }
+  .plus  { width: 32px; text-align: center; font: 700 32px/1.1 var(--font); color: var(--muted); }
+  .total { font: 700 44px/1.1 var(--font); color: var(--muted); }
+  .total b { margin: 0 6px; font: 800 68px/1.1 var(--font); color: var(--red); font-variant-numeric: tabular-nums; }
+  .total span { font: 700 30px var(--font); }
+  .tag   { position: absolute; margin: 0; height: 44px; padding: 0 22px; border-radius: 22px; background: var(--red); color: var(--paper); font: 800 26px/44px var(--font); white-space: nowrap; opacity: 0; }
+
+  .cap { position: absolute; left: 48px; right: 48px; bottom: 52px; margin: 0; font: 600 28px/1.25 var(--font); color: var(--ink); text-wrap: balance; opacity: 0; }
+  .cap b  { font-weight: 800; }
+  .cap em { font-style: normal; font-weight: 800; color: var(--red); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Question 1: What do you split?</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, html, tok, EASE } = Anim;
+
+// ---- small helpers ----------------------------------------------------------------------------------------------------
+const f2 = v => +v.toFixed(2);
+const fmt = n => n.toLocaleString("en-US");
+const show = (el, on) => { el.style.opacity = on ? 1 : 0; };
+const tr = (x, y) => `translate(${f2(x)}px, ${f2(y)}px)`;
+const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+const rise = [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }];
+const pop = [{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1)" }];
+const flash = [{ opacity: 0, offset: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.6 }, { opacity: 0, offset: 1 }];
+const sayList = a => (a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]);
+
+const DT = 36;                                  // ms per breadth-first step, as in the fire animation
+const FRONT = 3, BURN = 9, ASH_FADE = 3;        // steps a cell stays yellow, then orange; steps it takes to go dark
+const LIFE = FRONT + BURN + ASH_FADE;
+
+// ---- geometry (stage pixels) ------------------------------------------------------------------------------------------
+const CELL = 5;                                                  // px per forest cell: 64 cells are 320 px
+const BAND = 16, GAP = 30, TOP = 172, FX = 176;                   // beats 2 and 3: bands of 16 rows, the cut between them, the left edge
+const PILL = { w: 272, h: 44, gap: 32, x0: 48, y: 96, y0: 300 }; // the row of labels: at the top from beat 1, mid-stage at beat 0
+const X1 = [80, 480, 880], Y1 = 220;                             // beat 1: three forests
+const SUM = { x: 640, y: 330, pitch: 118 };                      // beat 2: where the four counts slide together
+const BOX = { w: 300, h: 184, y: 290, x: [120, 490, 860], ts: 80 };   // beat 4: stage boxes; each holds a tile per item
+const CARD = { w: 576, h: 228, x: [48, 656], y: [100, 344] };    // beat 5: the 2 x 2 grid
+const cards = [0, 1, 2, 3].map(i => ({ x: CARD.x[i % 2], y: CARD.y[i >> 1] }));
+const bandH = BAND * CELL, bandY = b => TOP + b * (bandH + GAP);
+const gapY = e => bandY(e) + bandH + GAP / 2;                    // the middle of the cut under band e
+
+let C;                                                           // literal colors for animations, read from the tokens
+let stage, art, size, side, runs, sixty;
+let pills, caps = [null], g1, inputs, gB, bands, ticks, chips, plus, total, gK, gP, tiles, trail, results, gC, tag;
+const alt = [];
+
+// ---- a forest: every tree, and one overlay per burn step that changes color as the fire passes -------------------------
+function runsOf(cells, n, r0, r1) {              // [col, row, length] for the cells that pass `keep`, merged along each row
+  return keep => {
+    const out = [];
+    for (let r = r0; r < r1; r++) {
+      let c = 0;
+      while (c < n) {
+        if (!keep(cells[r * n + c])) { c++; continue; }
+        let e = c;
+        while (e + 1 < n && keep(cells[r * n + e + 1])) e++;
+        out.push([c, r - r0, e - c + 1]);
+        c = e + 1;
+      }
+    }
+    return out;
+  };
+}
+const pathOf = (rs, cell) => rs.map(([c, r, n]) => `M${f2(c * cell)} ${f2(r * cell)}h${f2(n * cell)}v${f2(cell)}h${f2(-n * cell)}z`).join("");
+
+// Rows r0..r1 of a run, drawn at (ox, oy). steps: one overlay path per burn step, to play the fire; otherwise one path for
+// every cell that burns, to color at once. `trees` counts the trees in those rows.
+function buildForest(parent, run, cell, ox, oy, r0 = 0, r1 = run.size, steps = true) {
+  const n = run.size, cells = run.cells;
+  const g = svg("g", { class: "forest", transform: `translate(${f2(ox)} ${f2(oy)})` }, parent);
+  svg("rect", { class: "f-ground", width: n * cell, height: (r1 - r0) * cell }, g);
+  const f = { g, steps: [], trees: 0 };
+  f.treePath = svg("path", { class: "f-tree", d: pathOf(runsOf(cells, n, r0, r1)(v => v !== -2), cell) }, g);
+  for (let i = r0 * n; i < r1 * n; i++) if (cells[i] !== -2) f.trees++;
+  if (steps) {
+    const byStep = new Map();                    // burn step -> the cells (indexes within these rows) that burn then
+    for (let i = r0 * n; i < r1 * n; i++) { const v = cells[i]; if (v >= 0) { if (!byStep.has(v)) byStep.set(v, []); byStep.get(v).push(i - r0 * n); } }
+    for (const [k, list] of [...byStep].sort((a, b) => a[0] - b[0])) {
+      const merged = [];
+      for (const i of list) {
+        const r = Math.floor(i / n), c = i % n, last = merged[merged.length - 1];
+        if (last && last[1] === r && last[0] + last[2] === c) last[2]++; else merged.push([c, r, 1]);
+      }
+      const path = svg("path", { d: pathOf(merged, cell) }, g);
+      path.style.fill = C.tree;
+      f.steps.push({ k, path });
+    }
+  } else {
+    f.burn = svg("path", { d: pathOf(runsOf(cells, n, r0, r1)(v => v >= 0), cell) }, g);
+    f.burn.style.fill = C.tree;
+  }
+  return f;
+}
+const startForest = f => f.steps.forEach(s => { s.path.style.fill = C.tree; });
+const endForest = f => f.steps.forEach(s => { s.path.style.fill = C.ash; });
+
+// the color of a burning cell over its life: ignites yellow, burns orange, goes dark
+function lifeKeyframes() {
+  const t = s => s / LIFE;
+  return [
+    { fill: C.tree, offset: 0 }, { fill: C.hunt, offset: 0.01 }, { fill: C.hunt, offset: t(FRONT) },
+    { fill: C.flame, offset: t(FRONT + 1.5) }, { fill: C.flame, offset: t(FRONT + BURN) }, { fill: C.ash, offset: 1 },
+  ];
+}
+// play the forests: every step's cells change color in turn; returns the time the last cell has gone dark
+function burn(list, animate, lead) {
+  const kf = lifeKeyframes();
+  let last = 0;
+  for (const f of list) for (const s of f.steps) {
+    animate(s.path, kf, { duration: LIFE * DT, delay: lead + s.k * DT, easing: EASE.linear });
+    last = Math.max(last, s.k);
+  }
+  return lead + (last + LIFE) * DT;
+}
+
+// ---- drawing helpers --------------------------------------------------------------------------------------------------
+function badge(parent, x, y, text) {             // a worker's badge, straddling the top-left corner of its outline
+  const g = svg("g", { class: "fb" }, parent);
+  svg("rect", { class: "badge-bg", x: x - 24, y: y - 17, width: 56, height: 34, rx: 17 }, g);
+  svg("text", { class: "badge-t", x: x + 4, y, dy: "0.35em", text }, g);
+  return g;
+}
+const outline = (parent, x, y, w, h, cls = "") => svg("rect", { class: "frame " + cls, x: x - 2.5, y: y - 2.5, width: w + 5, height: h + 5, rx: 10 }, parent);
+
+function arrow(parent, x1, y1, x2, y2) {         // a paper outline first, so the arrow reads over anything
+  const g = svg("g", { class: "fb" }, parent);
+  const len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len, H = 15, Wd = 9;
+  const bx = x2 - ux * H, by = y2 - uy * H;
+  const head = `${x2},${y2} ${bx - uy * Wd},${by + ux * Wd} ${bx + uy * Wd},${by - ux * Wd}`;
+  for (const cls of ["a-halo", "a-ink"]) {
+    svg("line", { class: cls, x1, y1, x2: bx, y2: by }, g);
+    svg("polygon", { class: cls, points: head }, g);
+  }
+  return g;
+}
+function tickGlyph(parent, x, y, s = 1) {        // a small two-way arrow: neighbors trading across an edge
+  const g = svg("g", {}, parent);
+  const h = 11 * s, w = 6.5 * s, hd = 7.5 * s;
+  const head = d => `${x},${y + d * h} ${x - w},${y + d * (h - hd)} ${x + w},${y + d * (h - hd)}`;
+  for (const cls of ["a-halo", "a-ink"]) {
+    svg("line", { class: cls, x1: x, y1: y - h + hd, x2: x, y2: y + h - hd }, g);
+    svg("polygon", { class: cls, points: head(1) }, g);
+    svg("polygon", { class: cls, points: head(-1) }, g);
+  }
+  return g;
+}
+
+// ---- the labels: where each is and what it looks like, per beat -------------------------------------------------------
+function pillState(n, i) {
+  const home = { x: PILL.x0 + i * (PILL.w + PILL.gap), y: PILL.y };
+  let dx = 0, dy = 0, on = false;
+  if (n === 0) dy = PILL.y0 - PILL.y;
+  else if (n <= 4) on = i === n - 1;
+  else { dx = cards[i].x + 16 - home.x; dy = cards[i].y + 14 - home.y; on = i === 0; }
+  return { tf: tr(dx, dy), bg: on ? C.red : C.idle, fg: on ? C.paper : C.muted };
+}
+const applyPill = (el, s) => { el.style.transform = s.tf; el.style.backgroundColor = s.bg; el.style.color = s.fg; };
+function movePills(n, animate) {
+  pills.forEach((p, i) => {
+    const a = pillState(n - 1, i), b = pillState(n, i), moved = a.tf !== b.tf;
+    if (moved) animate(p, [{ transform: a.tf }, { transform: b.tf }], { duration: n === 5 ? 900 : 700, easing: EASE.inOut });
+    if (a.bg !== b.bg) animate(p, [{ backgroundColor: a.bg, color: a.fg }, { backgroundColor: b.bg, color: b.fg }], { duration: 400, delay: moved ? 300 : 0 });
+  });
+}
+const collapsed = j => tr(X1[1] - FX, Y1 + j * bandH - bandY(j));   // band j where the whole forest of beat 1 sits
+const slot = (j, k) => ({ x: BOX.x[j] + 20 + k * 90, y: BOX.y + 72 });   // where item k sits in stage j (top-left of its tile)
+
+// ---- setup: draws the page from the data ------------------------------------------------------------------------------------
+function setup(ctx, [fireRuns, sweep]) {
+  stage = ctx.stage;
+  art = document.getElementById("art");
+  const tk = n => tok("--" + n);
+  C = { tree: tk("tree"), hunt: tk("hunt"), flame: tk("flame"), ash: tk("ash"), red: tk("red"), idle: tk("idle"), muted: tk("muted"), paper: tk("paper") };
+  size = fireRuns.size;
+  side = size * CELL;
+  runs = fireRuns.runs.map(r => Object.assign({ size }, r)).sort((a, b) => a.density - b.density);
+  sixty = runs.reduce((a, r) => (Math.abs(r.density - 0.6) < Math.abs(a.density - 0.6) ? r : a));
+  const sweepSize = sweep.results.length, pct = r => Math.round(r.density * 100);
+  const T = (cls, text, x, y, parent = stage) => html("p", { class: cls, html: text, style: { left: x + "px", top: y + "px" } }, parent);
+
+  // the four labels
+  pills = ["the inputs", "the data", "the space", "the steps"].map((t, i) =>
+    html("p", { class: "pill", text: t, style: { left: PILL.x0 + i * (PILL.w + PILL.gap) + "px", top: PILL.y + "px" } }, stage));
+
+  // beat 1: three whole forests, a worker each
+  g1 = svg("g", {}, art);
+  inputs = runs.slice(0, 3).map((r, k) => {
+    const x = X1[k], y = Y1, outer = svg("g", {}, g1);
+    buildForest(outer, r, CELL, x, y);
+    const frame = outline(g1, x, y, side, side), bd = badge(g1, x, y, "W" + (k + 1));
+    const lab = T("t dens", `<b>${pct(r)}%</b> <span>trees</span>`, x, y - 50);
+    return { outer, frame, badge: bd, lab };
+  });
+
+  // beats 2 and 3: the 60% forest in four bands of 16 rows, a worker each
+  gB = svg("g", {}, art);
+  bands = [0, 1, 2, 3].map(b => {
+    const bg = svg("g", {}, gB), y = bandY(b);
+    const f = buildForest(bg, sixty, CELL, FX, y, b * BAND, (b + 1) * BAND);
+    return { bg, f, frame: outline(bg, FX, y, side, bandH), badge: badge(bg, FX, y, "W" + (b + 1)) };
+  });
+  const counts = bands.map(b => b.f.trees), sum = counts.reduce((a, v) => a + v, 0);
+  // where the fire crosses a band edge: a burned cell on each side of the edge, one lit by the other
+  gK = svg("g", {}, art);
+  const gT = svg("g", {}, gB);
+  ticks = [];
+  for (let e = 0; e < 3; e++) for (let c = 0; c < size; c++) {
+    const a = sixty.cells[((e + 1) * BAND - 1) * size + c], d = sixty.cells[(e + 1) * BAND * size + c];
+    if (a < 0 || d < 0 || a === d) continue;
+    const g = tickGlyph(gT, FX + (Math.max(c, 9) + 0.5) * CELL, gapY(e), 1.2);   // clear of the badge on the band below
+    g.style.opacity = 0;
+    ticks.push({ k: Math.max(a, d), g });
+  }
+  chips = bands.map((b, j) => {
+    const cx = FX + side + 56, cy = bandY(j) + bandH / 2;
+    const el = T("t chip", `${counts[j]}<span> trees</span>`, cx, cy - 18);
+    return { el, suf: el.querySelector("span"), dx: SUM.x + j * SUM.pitch - cx, dy: SUM.y - cy };
+  });
+  plus = [0, 1, 2].map(j => T("t plus", "+", SUM.x + j * SUM.pitch + 73, SUM.y - 18));
+  total = T("t total", `<span>=</span><b>${fmt(sum)}</b><span>trees</span>`, SUM.x, SUM.y + 26);
+
+  // beat 3's key
+  const kx = 640, rows = [270, 324, 378, 432];
+  tickGlyph(gK, kx + 15, rows[0], 1.1);
+  svg("text", { class: "key-t b", x: kx + 48, y: rows[0], dy: "0.35em", text: "neighbors trade an edge" }, gK);
+  [["tree", C.tree], ["burning", C.flame], ["burnt", C.ash]].forEach(([name, color], i) => {
+    svg("rect", { x: kx, y: rows[i + 1] - 15, width: 30, height: 30, rx: 8, fill: color }, gK);
+    svg("text", { class: "key-t", x: kx + 48, y: rows[i + 1], dy: "0.35em", text: name }, gK);
+  });
+
+  // beat 4: a pipeline of three stages, one worker each. Every item passes through all three, and each stage keeps a mark of
+  // every item it has handled: a made forest, a burned forest, a number.
+  gP = svg("g", {}, art);
+  const yc = BOX.y + BOX.h / 2;
+  ["make a forest", "burn it", "summarize"].forEach((name, j) => {
+    const x = BOX.x[j];
+    outline(gP, x, BOX.y, BOX.w, BOX.h);
+    svg("text", { class: "box-t", x: x + BOX.w / 2, y: BOX.y + 38, text: name }, gP);
+    badge(gP, x, BOX.y, "W" + (j + 1));
+    if (j < 2) arrow(gP, x + BOX.w + 10, yc, BOX.x[j + 1] - 10, yc);
+  });
+  const tile = (r, x, y, color) => {                              // an 80 px forest tile; color is what its burned cells look like
+    const outer = svg("g", {}, gP);
+    const f = buildForest(outer, r, BOX.ts / size, x, y, 0, size, false);
+    if (color) f.burn.style.fill = color;
+    svg("rect", { class: "f-line", x: x - 1.5, y: y - 1.5, width: BOX.ts + 3, height: BOX.ts + 3, rx: 4 }, outer);
+    return { outer, f };
+  };
+  trail = [C.tree, C.ash].map((color, j) => runs.slice(0, 3).map((r, k) => tile(r, slot(j, k).x, slot(j, k).y, color)));
+  tiles = runs.slice(0, 3).map(r => { const t = tile(r, 0, 0); t.outer.style.opacity = 0; return t; });
+  results = runs.slice(0, 3).map((r, k) => {
+    const g = svg("g", {}, gP);
+    svg("rect", { class: "res-bg", x: -40, y: -20, width: 80, height: 40, rx: 20 }, g);
+    svg("text", { class: "res-t", x: 0, y: 0, dy: "0.35em", text: r.burned_fraction.toFixed(2) }, g);
+    g.style.transform = tr(slot(2, k).x + BOX.ts / 2, slot(2, k).y + BOX.ts / 2);
+    return g;
+  });
+
+  // beat 5: all four, small, in a grid. The drawings carry no text: they are reminders of beats 1 to 4.
+  gC = svg("g", {}, art);
+  cards.forEach((c, i) => svg("rect", { class: "card" + (i === 0 ? " on" : ""), x: c.x + (i ? 2 : 3), y: c.y + (i ? 2 : 3), width: CARD.w - (i ? 4 : 6), height: CARD.h - (i ? 4 : 6), rx: 26 }, gC));
+  const mini = i => { const g = svg("g", {}, gC); return { g, cx: cards[i].x + CARD.w / 2, top: cards[i].y + 72 }; };
+  tag = html("p", { class: "tag", text: "today’s demo", style: { right: 1280 - (cards[0].x + CARD.w - 16) + "px", top: cards[0].y + 14 + "px" } }, stage);
+  let m = mini(0);                                                // the inputs: three whole forests
+  runs.slice(0, 3).forEach((r, k) => {
+    const x = m.cx - 228 + k * 164, y = m.top + 7;
+    buildForest(m.g, r, 2, x, y, 0, size, false);
+    outline(m.g, x, y, 128, 128, "thin");
+  });
+  const minis = (i, burned) => {                                  // the data, and the space: one forest in four bands
+    const mm = mini(i), cell = 1.875, bh = BAND * cell, gap = 7, x = mm.cx - size * cell / 2;
+    for (let b = 0; b < 4; b++) {
+      const y = mm.top + b * (bh + gap), f = buildForest(mm.g, sixty, cell, x, y, b * BAND, (b + 1) * BAND, false);
+      if (burned) f.burn.style.fill = C.ash;
+      outline(mm.g, x, y, size * cell, bh, "thin");
+      if (burned && b < 3) for (const q of [0.3, 0.7]) tickGlyph(mm.g, x + size * cell * q, y + bh + gap / 2, 0.6);
+    }
+  };
+  minis(1, false);
+  minis(2, true);
+  m = mini(3);                                                    // the steps: three stages, a forest at each
+  [C.tree, C.flame, C.ash].forEach((color, j) => {
+    const w = 112, h = 84, x = m.cx - 224 + j * 168, y = m.top + 71 - h / 2;
+    svg("rect", { class: "frame mid", x, y, width: w, height: h, rx: 12 }, m.g);
+    const f = buildForest(m.g, runs[1], 0.875, x + (w - 56) / 2, y + (h - 56) / 2, 0, size, false);
+    f.burn.style.fill = color;
+    if (j < 2) arrow(m.g, x + w + 6, y + h / 2, x + 168 - 6, y + h / 2);
+  });
+
+  // the words under each beat
+  const cap = html_ => html("p", { class: "cap", html: html_ }, stage);
+  caps.push(cap(`<b>Split the inputs:</b> each worker gets whole runs, like our ${fmt(sweepSize)}-forest sweep.`));
+  caps.push(cap("<b>Split the data:</b> each worker takes a slice of one big dataset, and the answers are combined."));
+  caps.push(cap("<b>Split the space:</b> each worker owns a region, and neighbors trade their edges every step. This is <em>domain decomposition</em>."));
+  caps.push(cap("<b>Split the steps:</b> each worker does one step for every item. A <em>pipeline</em>."));
+  caps.push(cap("<b>One problem, four ways to split it.</b> Next question: how often do the pieces talk?"));
+
+  // the text alternative of each beat
+  alt.push("Four gray labels sit in a row under the title: the inputs, the data, the space and the steps.");
+  alt.push(`The inputs: three whole forests with ${sayList(runs.slice(0, 3).map(pct))} percent trees go to workers W1, W2 and W3, one forest each, like the ${fmt(sweepSize)}-forest sweep.`);
+  alt.push(`The data: the ${pct(sixty)} percent forest is cut into four bands of ${BAND} rows for workers W1 to W4, each band shows its tree count (${counts.join(", ")}), and the four counts slide together into one total of ${fmt(sum)} trees.`);
+  alt.push("The space: the same banded forest burns, and small two-way ticks flash on the band edges where the fire crosses, because each worker owns a region and neighbors trade their edges every step, which is domain decomposition.");
+  alt.push(`The steps: three stage boxes, make a forest, burn it and summarize, belong to workers W1, W2 and W3, and small forest tiles pass through them one after another until each ends as a number (${runs.slice(0, 3).map(r => r.burned_fraction.toFixed(2)).join(", ")}), which is a pipeline.`);
+  alt.push("All four ways to split the problem sit small in a 2 by 2 grid, with the inputs outlined in red and tagged today's demo.");
+}
+
+defineAnimation({
+  beats: 5,
+  alt,
+  load: () => Promise.all([Anim.loadJSON("data/fire-runs.json"), Anim.loadJSON("data/sweep.json")]),
+  setup,
+
+  render(n, ctx) {
+    pills.forEach((p, i) => applyPill(p, pillState(n, i)));
+    caps.forEach((c, i) => { if (c) show(c, i === n); });
+    show(g1, n === 1);                                            // beat 1: the inputs
+    inputs.forEach(it => { show(it.outer, true); show(it.frame, true); show(it.badge, true); show(it.lab, n === 1); });
+    show(gB, n === 2 || n === 3);                                 // beats 2 and 3: the bands
+    bands.forEach((b, j) => {
+      b.bg.style.transform = n >= 2 ? tr(0, 0) : collapsed(j);
+      show(b.frame, n >= 2);
+      show(b.badge, n >= 2);
+      (n >= 3 ? endForest : startForest)(b.f);
+    });
+    ticks.forEach(t => show(t.g, false));
+    chips.forEach(c => { show(c.el, n === 2); c.el.style.transform = n === 2 ? tr(c.dx, c.dy) : ""; show(c.suf, n < 2); });
+    plus.forEach(p => show(p, n === 2));
+    show(total, n === 2);
+    show(gK, n === 3);
+    show(gP, n === 4);                                            // beat 4: the pipeline
+    tiles.forEach(t => show(t.outer, false));
+    trail.forEach(row => row.forEach(t => show(t.outer, true)));
+    results.forEach(g => show(g, true));
+    show(gC, n === 5);                                            // beat 5: the grid
+    show(tag, n === 5);
+  },
+
+  enter(n, { animate }) {
+    const words = (delay = 300) => { animate(caps[n - 1], fade(1, 0), { duration: 400 }); animate(caps[n], rise, { duration: 500, delay }); };
+    movePills(n, animate);
+
+    if (n === 1) {                                                // three whole forests, each into its own worker
+      show(g1, true);
+      animate(caps[1], rise, { duration: 500, delay: 500 });
+      inputs.forEach((it, k) => {
+        animate(it.frame, fade(0, 1), { duration: 400, delay: 500 + k * 150 });
+        animate(it.badge, pop, { duration: 450, delay: 650 + k * 150, easing: EASE.pop });
+        animate(it.outer, [{ opacity: 0, transform: "translateY(-36px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 700, delay: 1100 + k * 250 });
+        animate(it.lab, rise, { duration: 500, delay: 1500 + k * 250 });
+      });
+    }
+
+    if (n === 2) {                                                // the 60% forest is cut into four bands, and the counts add up
+      words();
+      inputs[1].outer.style.opacity = 0;                          // handed to the bands, which sit exactly where it was
+      animate(g1, fade(1, 0), { duration: 450 });
+      inputs.forEach(it => animate(it.lab, fade(1, 0), { duration: 400 }));
+      show(gB, true);
+      bands.forEach((b, j) => {
+        animate(b.bg, [{ transform: collapsed(j) }, { transform: tr(0, 0) }], { duration: 1000, delay: 350, easing: EASE.inOut });
+        animate(b.frame, fade(0, 1), { duration: 400, delay: 1100 });
+        animate(b.badge, pop, { duration: 450, delay: 1250 + j * 130, easing: EASE.pop });
+      });
+      chips.forEach((c, j) => {
+        animate(c.el, fade(0, 1), { duration: 500, delay: 2000 + j * 150 });
+        animate(c.suf, fade(1, 0), { duration: 400, delay: 3500 });
+        animate(c.el, [{ transform: tr(0, 0) }, { transform: tr(c.dx, c.dy) }], { duration: 1000, delay: 3400, easing: EASE.inOut });
+      });
+      plus.forEach((p, j) => animate(p, fade(0, 1), { duration: 400, delay: 4300 + j * 80 }));
+      animate(total, rise, { duration: 600, delay: 4700 });
+    }
+
+    if (n === 3) {                                                // the same bands burn; neighbors trade across the cuts
+      words();
+      [...chips.map(c => c.el), ...plus, total].forEach(e => animate(e, fade(1, 0), { duration: 400 }));
+      show(gK, true);
+      animate(gK, fade(0, 1), { duration: 500, delay: 300 });
+      const lead = 800;
+      burn(bands.map(b => b.f), animate, lead);
+      ticks.forEach(t => animate(t.g, flash, { duration: 800, delay: lead + t.k * DT, easing: EASE.linear }));
+    }
+
+    if (n === 4) {                                                // a pipeline: each worker does one step for every item
+      words();
+      animate(gB, fade(1, 0), { duration: 450 });
+      animate(gK, fade(1, 0), { duration: 450 });
+      show(gP, true);
+      animate(gP, fade(0, 1), { duration: 500, delay: 300 });
+      const S = 1000, M = 420, L = 900;                           // a slot is S ms: the items move (M), then every stage works on its item
+      tiles.forEach((t, k) => {
+        t.f.treePath.style.opacity = 0; t.f.burn.style.opacity = 0; t.f.burn.style.fill = C.tree;
+        trail.forEach(row => { row[k].outer.style.opacity = 0; });
+        results[k].style.opacity = 0;
+        for (let j = 0; j < 3; j++) {                             // slot k + j: item k reaches stage j, and the stage works on it
+          const t0 = L + (k + j) * S, w0 = t0 + M + 50, to = slot(j, k), at = tr(to.x, to.y);
+          if (j === 0) animate(t.outer, [{ transform: at, opacity: 0 }, { transform: at, opacity: 1 }], { duration: M, delay: t0 });
+          else {
+            const from = slot(j - 1, k);
+            animate(t.outer, [{ transform: tr(from.x, from.y) }, { transform: at }], { duration: M, delay: t0, easing: EASE.inOut, fill: "forwards" });   // forwards only: a later move must not hold its start pose over an earlier one
+            animate(trail[j - 1][k].outer, fade(0, 1), { duration: 60, delay: t0 });      // the stage it leaves keeps a copy
+          }
+          if (j === 0) [t.f.treePath, t.f.burn].forEach(p => animate(p, fade(0, 1), { duration: 450, delay: w0 }));
+          if (j === 1) animate(t.f.burn, [{ fill: C.tree }, { fill: C.hunt, offset: 0.25 }, { fill: C.flame, offset: 0.6 }, { fill: C.ash }], { duration: 500, delay: w0, easing: EASE.linear });
+          if (j === 2) {
+            animate(t.outer, fade(1, 0), { duration: 400, delay: w0 + 70, fill: "forwards" });
+            const c = tr(to.x + BOX.ts / 2, to.y + BOX.ts / 2);
+            animate(results[k], [{ opacity: 0, transform: c + " scale(0.6)" }, { opacity: 1, transform: c + " scale(1)" }], { duration: 400, delay: w0 + 70, easing: EASE.pop });
+          }
+        }
+      });
+    }
+
+    if (n === 5) {                                                // all four, small
+      words(700);
+      animate(gP, fade(1, 0), { duration: 450 });
+      show(gC, true);
+      animate(gC, fade(0, 1), { duration: 600, delay: 400 });
+      animate(tag, pop, { duration: 450, delay: 1100, easing: EASE.pop });
+    }
+  },
+});
+</script>
+</body>
+</html>

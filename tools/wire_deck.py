@@ -29,7 +29,8 @@ SITE = ROOT / "site/_site"
 SLIDES = {
     "anim-cores": "cores.html",
     "anim-lanes-primer": "lanes-primer.html",
-    "anim-kinds": "kinds.html",
+    "anim-split": "split.html",
+    "anim-talk": "talk.html",
     "anim-waiting": "waiting.html",
     "anim-where": "where.html",
     "decision-map": "decision-map.html",
@@ -88,7 +89,7 @@ def wire():
         sid, page = m.group(1), SLIDES[m.group(1)]
         d = info[page]
         j = i + 1                                         # the slide runs to the next heading
-        while j < len(lines) and not re.match(r"^#{1,2} ", lines[j]):
+        while j < len(lines) and not re.match(r"^#{1,2} |^\{\{< include ", lines[j]):   # an include belongs to the deck
             j += 1
         block = [f'## {md(d["title"])} {{#{sid} data-state="anim-slide" background-iframe="anim/{page}" background-interactive="true"}}', ""]
         for _ in range(d["beats"]):

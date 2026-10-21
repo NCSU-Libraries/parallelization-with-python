@@ -47,6 +47,7 @@ Paths marked *(planned)* don't exist yet.
 | `site/` | Quarto website and the reveal.js deck (`site/slides/index.qmd`) |
 | `site/_variables.yml` | Facts used on several pages and in the deck: event, links, the go link |
 | `site/slides/anim/` | One standalone HTML page per animation, plus `_shared/` (stage fit, beats, deck bridge, palette) |
+| `site/slides/_bonus-split.qmd`, `_landscape.qmd` | Static slides that the deck includes: the "if there's time" split-the-data bonus after Demo 3, and the wider landscape after the tool ladder. `tools/wire_deck.py` leaves include lines alone |
 | `site/slides/anim/data/` | JSON recorded from real runs by `tools/record_runs.py`. Don't hand-edit it; re-record instead |
 | `code/fire.py` | The forest-fire model that the demos and the notebook use |
 | `tools/record_runs.py` | Runs the sweep on this machine: scaling timings, per-task traces, and burn steps for the animations |

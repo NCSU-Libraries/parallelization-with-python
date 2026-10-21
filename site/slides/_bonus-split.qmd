@@ -1,0 +1,24 @@
+# If there's time: split the data {.divider background-color="#CC0000"}
+
+## Split the data {#bonus-split}
+
+```{=html}
+<pre class="type diagram" style="width:auto; font-size:0.55em; margin:8px 0 18px; padding:20px 18px">from multiprocessing import Pool
+from fire import count_band
+
+size = 8000                                     <span style="color:#A9A9A9"># one forest, 64 million cells</span>
+bands = [(size, 0.6, 1, first, 500) for first in range(0, size, 500)]
+
+with Pool() as pool:
+    counts = pool.map(count_band, bands)        <span style="color:#A9A9A9"># each worker builds and counts its own bands</span>
+total = sum(counts)                             <span style="color:#A9A9A9"># combine once, at the end</span>
+</pre>
+```
+
+::: {.card .red}
+[Send where the slice is, not the slice,]{.card-title} like each worker reading its own chunk of a big file.
+:::
+
+::: {.muted}
+In the notebook: the bonus section.
+:::

@@ -6,7 +6,8 @@
 <title>Where parallelism lives</title>
 <link rel="stylesheet" href="_shared/anim.css">
 <style>
-  /* A5: where parallelism lives. A zoom out: each level shrinks into the next. The chip is drawn as in A1 (cores.html). */
+  /* A5: where parallelism lives. A zoom out: each level shrinks into the next. The chip is drawn as in A1 (cores.html).
+     Beat 1 opens the core to show vectorizing: a plain loop takes one number at a time, a vector unit takes eight. */
   .chip-base  { fill: var(--idle); }
   .chip-plate { fill: var(--paper); stroke: var(--line); stroke-width: 5; }
   .chip-pin   { fill: var(--line); }
@@ -18,6 +19,15 @@
   .g-lit  { fill: var(--red); }
   .rack   { fill: none; stroke: var(--line); stroke-width: 4; }
   .part   { font: 800 26px var(--font); fill: var(--ink); }
+
+  /* the opened core (beat 1): a frame, two panels, and a row of eight numbers in each; a red window is what the core takes in one step */
+  .v-frame { fill: color-mix(in srgb, var(--red) 9%, var(--paper)); stroke: var(--red); stroke-width: 5; }
+  .v-panel { fill: var(--paper); stroke: var(--line); stroke-width: 4; }
+  .v-tile  { fill: var(--idle); stroke: var(--overhead); stroke-width: 3; }
+  .v-win   { fill: color-mix(in srgb, var(--red) 12%, transparent); stroke: var(--red); stroke-width: 6; }
+  .v-lead  { font: 800 28px var(--font); fill: var(--ink); }
+  .v-sub   { font: 600 28px var(--font); fill: var(--ink); }
+  .v-dig   { font: 800 36px var(--font); fill: var(--ink); }
 
   /* the breadcrumb along the top: the current level is dark with a red bar under it */
   .crumbs { position: absolute; left: 0; top: 96px; width: 1280px; display: flex; justify-content: center; gap: 22px; margin: 0; font: 700 30px/36px var(--font); white-space: nowrap; }
@@ -31,6 +41,8 @@
   .tag { position: absolute; left: 798px; top: 197px; height: 44px; padding: 0 22px; border-radius: 22px; background: var(--red); color: var(--paper); font: 800 26px/44px var(--font); opacity: 0; }
   .lbl { position: absolute; left: 160px; width: 960px; top: 594px; margin: 0; text-align: center; font: 600 32px/1.12 var(--font); color: var(--ink); text-wrap: balance; opacity: 0; }
   .lbl b { font-weight: 800; }
+  .lbl.wide { left: 90px; width: 1100px; top: 548px; font-size: 28px; line-height: 1.2; }   /* the vectorizing label is longer: three lines */
+  .lbl .take { display: block; margin-top: 6px; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -55,9 +67,10 @@
 
   <span class="tag" id="tag" aria-hidden="true">today</span>
   <p class="lbl" id="lbl0" aria-hidden="true"><b>One core:</b> a plain loop</p>
-  <p class="lbl" id="lbl1" aria-hidden="true"><b>One chip:</b> multiprocessing, concurrent.futures, joblib</p>
-  <p class="lbl" id="lbl2" aria-hidden="true"><b>One computer:</b> a GPU adds thousands of small cores: PyTorch, CuPy, Numba</p>
-  <p class="lbl" id="lbl3" aria-hidden="true"><b>Many computers:</b> a cluster such as NC&nbsp;State's Hazel. Job arrays, Dask, Ray, mpi4py</p>
+  <p class="lbl wide" id="lbl1" aria-hidden="true"><b>One core, vectorized:</b> NumPy runs a compiled loop over the whole array, and the core's vector units handle several numbers per instruction. <span class="take">Vectorize first; it's often the biggest win.</span></p>
+  <p class="lbl" id="lbl2" aria-hidden="true"><b>One chip:</b> multiprocessing, concurrent.futures, joblib</p>
+  <p class="lbl" id="lbl3" aria-hidden="true"><b>One computer:</b> a GPU splits the data across thousands of small cores: PyTorch, CuPy, Numba</p>
+  <p class="lbl" id="lbl4" aria-hidden="true"><b>Many computers:</b> a cluster such as NC&nbsp;State's Hazel. Job arrays, Dask, Ray, mpi4py</p>
 </main>
 
 <script src="_shared/anim.js"></script>
@@ -112,6 +125,25 @@ const ORIGIN = `${CX}px ${CY}px`;
 const gCore = svg("g", {}, art);
 svg("rect", { class: "c-lit", x: CX - 120, y: CY - 120, width: 240, height: 240, rx: 52, style: { strokeWidth: "5px" } }, gCore);
 
+// level 0, opened (beat 1): the same eight numbers twice. A plain loop takes them one at a time, a vector unit takes all eight in one step.
+const DIGITS = [3, 1, 4, 1, 5, 9, 2, 6];
+const VF = { x: 90, y: 196, w: 1100, h: 300 };                  // the opened core
+const VP = { w: 508, y: 224, h: 244, xs: [118, 654] };          // two panels inside it
+const TILE = { w: 48, h: 80, gap: 10, y: 352 }, PITCH = TILE.w + TILE.gap, ROWW = 8 * TILE.w + 7 * TILE.gap;
+const gVec = svg("g", {}, art);
+svg("rect", { class: "v-frame", x: VF.x, y: VF.y, width: VF.w, height: VF.h, rx: 40 }, gVec);
+const tileX = (k, i) => VP.xs[k] + (VP.w - ROWW) / 2 + i * PITCH;   // panel k, number i
+VP.xs.forEach((px, k) => {
+  svg("rect", { class: "v-panel", x: px, y: VP.y, width: VP.w, height: VP.h, rx: 26 }, gVec);
+  svg("text", { class: "v-lead", x: px + VP.w / 2, y: VP.y + 46, "text-anchor": "middle", text: ["a loop:", "a vector unit:"][k] }, gVec);
+  svg("text", { class: "v-sub", x: px + VP.w / 2, y: VP.y + 82, "text-anchor": "middle", text: ["one number at a time", "8 numbers in one step"][k] }, gVec);
+  DIGITS.forEach((_, i) => svg("rect", { class: "v-tile", x: tileX(k, i), y: TILE.y, width: TILE.w, height: TILE.h, rx: 10 }, gVec));
+});
+// a red window is what the core takes in one step: one number for the loop, all eight for the vector unit. It sits above the tiles, below the numbers.
+const winL = svg("rect", { class: "v-win", x: tileX(0, 0) - 5, y: TILE.y - 5, width: TILE.w + 10, height: TILE.h + 10, rx: 14 }, gVec);
+const winR = svg("rect", { class: "v-win fb", x: tileX(1, 0) - 5, y: TILE.y - 5, width: ROWW + 10, height: TILE.h + 10, rx: 14 }, gVec);
+VP.xs.forEach((_, k) => DIGITS.forEach((d, i) => svg("text", { class: "v-dig", x: tileX(k, i) + TILE.w / 2, y: TILE.y + 53, "text-anchor": "middle", text: d }, gVec)));
+
 // level 1: the chip, 14 cores
 const gChip = svg("g", {}, art);
 const chip = drawChip(gChip, CX, CY, 576);
@@ -145,7 +177,7 @@ const nodes = [];
 RACK.xs.forEach(x => [0, 1, 2, 3].forEach(i => nodes.push(svg("use", { href: "#node", class: "fb", x: x + 16, y: RACK.y + 16 + i * NODE.pitch }, gClu))));
 
 // stacking, bottom to top: the level a shrinking level lands in sits under it, so a shrinking level is always seen
-[gClu, gComp, gChip, gCore].forEach(g => art.appendChild(g));
+[gClu, gComp, gChip, gCore, gVec].forEach(g => art.appendChild(g));
 
 // where one level lands in the next (stage pixels, zoom about the middle of the picture)
 const c0 = chip.cores[0];
@@ -155,14 +187,14 @@ const N0 = { x: RACK.xs[0] + 16, y: RACK.y + 16 };                              
 const TO_NODE = { dx: N0.x + NODE.w / 2 - CX, dy: N0.y + NODE.h / 2 - CY, s: NODE.w / BOARD.w };   // the computer becomes a node
 const CPU_IN_NODE = { dx: N0.x + 38 - CX, dy: N0.y + 30.2 - CY, s: 57.6 / 576 };            // the chip's size and place inside that node
 const zoom = z => `${tr(z.dx, z.dy)} scale(${z.s})`;
-[gCore, gChip, gComp].forEach(g => { g.style.transformOrigin = ORIGIN; });
+[gCore, gVec, gChip, gComp].forEach(g => { g.style.transformOrigin = ORIGIN; });
 
 // ---- text, tag, breadcrumb ----------------------------------------------------------------------------------------------
-const lbls = [0, 1, 2, 3].map(i => $("lbl" + i)), tag = $("tag"), here = $("here");
+const lbls = [0, 1, 2, 3, 4].map(i => $("lbl" + i)), tag = $("tag"), here = $("here");
 const crumbs = [0, 1, 2, 3].map(i => $("cr" + i)), bars = crumbs.map(c => c.querySelector(".bar"));
 const INK = Anim.tok("--ink"), MUTED = Anim.tok("--muted");
-const LEVEL = [0, 1, 2, 3, 1];                                 // which crumb is current at each beat (beat 4 is back at the chip)
-const LBL = [0, 1, 2, 3, 1];                                   // and which label shows
+const LEVEL = [0, 0, 1, 2, 3, 1];                              // which crumb is current at each beat (beat 1 is still the core; beat 5 is back at the chip)
+const LBL = [0, 1, 2, 3, 4, 2];                                // and which label shows
 
 const fade = (a, b) => [{ opacity: a }, { opacity: b }];
 const rise = [{ opacity: 0, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }];
@@ -170,25 +202,29 @@ const pop = [{ opacity: 0, transform: "scale(0.84)" }, { opacity: 1, transform: 
 const tagPop = [{ opacity: 0, transform: "scale(0.7)" }, { opacity: 1, transform: "scale(1)" }];
 
 defineAnimation({
-  beats: 4,
+  beats: 5,
   alt: [
     "A breadcrumb along the top reads core, chip, computer, cluster, with core marked, and one big red square stands for a single core, labeled: One core, a plain loop.",
+    "The core opens to show a vector unit, a row of 8 slots that handle 8 numbers in one step, beside a plain loop that handles one number at a time, with the label: One core, vectorized, vectorize first.",
     "The core shrinks into a chip with 14 cores, drawn as in the first animation, and all 14 light up under a red today tag, with the label: One chip, multiprocessing, concurrent.futures, joblib.",
-    "The chip shrinks into a computer, where the CPU chip sits next to a GPU drawn as a dense grid of tiny cores, with the label: One computer, a GPU adds thousands of small cores, PyTorch, CuPy, Numba.",
+    "The chip shrinks into a computer, where the CPU chip sits next to a GPU drawn as a dense grid of tiny cores, with the label: One computer, a GPU splits the data across thousands of small cores, PyTorch, CuPy, Numba.",
     "The computer shrinks into one node of a cluster of rack nodes, with the label: Many computers, a cluster such as NC State's Hazel, job arrays, Dask, Ray, mpi4py.",
     "The view zooms back in to the chip, the breadcrumb marks chip with You are here under it, and the label again reads: One chip, multiprocessing, concurrent.futures, joblib.",
   ],
 
   render(n) {
     scene(gCore, n === 0);
-    scene(gChip, n === 1 || n === 4);
-    scene(gComp, n === 2);
-    scene(gClu, n === 3);
-    chip.cores.forEach(c => { c.lit.style.opacity = n >= 1 ? 1 : 0; c.lit.style.transform = ""; });
-    [board, cpu.g, gGpu, ...parts, ...bands, ...racks, ...nodes].forEach(el => scene(el, true));
+    scene(gVec, n === 1);
+    scene(gChip, n === 2 || n === 5);
+    scene(gComp, n === 3);
+    scene(gClu, n === 4);
+    chip.cores.forEach(c => { c.lit.style.opacity = n >= 2 ? 1 : 0; c.lit.style.transform = ""; });
+    [board, cpu.g, gGpu, ...parts, ...bands, ...racks, ...nodes, winR].forEach(el => scene(el, true));
+    scene(winL, true);
+    winL.style.transform = tr((DIGITS.length - 1) * PITCH, 0);   // the loop's window has reached the last number
     lbls.forEach((el, i) => scene(el, i === LBL[n]));
-    scene(tag, n === 1 || n === 4);
-    scene(here, n === 4);
+    scene(tag, n === 2 || n === 5);
+    scene(here, n === 5);
     crumbs.forEach((el, i) => {
       el.style.color = i === LEVEL[n] ? "var(--ink)" : "var(--muted)";
       scene(bars[i], i === LEVEL[n]);
@@ -207,18 +243,31 @@ defineAnimation({
       animate(lbls[to], rise, { duration: 500, delay });
     };
 
-    if (n === 1) {                                             // the core shrinks into the chip, then the other cores light up
-      animate(gCore, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_CHIP) }], { duration: 900, easing: EASE.inOut });
-      animate(gCore, fade(1, 0), { duration: 400, delay: 550 });
-      animate(gChip, fade(0, 1), { duration: 500, delay: 250 });
-      animate(chip.cores[0].lit, fade(0, 1), { duration: 400, delay: 650 });
-      for (let i = 1; i < 14; i++) animate(chip.cores[i].lit, pop, { duration: 400, delay: 1200 + (i - 1) * 90, easing: EASE.pop });
-      animate(tag, tagPop, { duration: 450, delay: 2500, easing: EASE.pop });
-      moveCrumb(0, 1);
-      swapLabel(0, 1, 600);
+    if (n === 1) {                                             // the core opens: a loop takes one number at a time, a vector unit takes eight
+      const HOP = 450, FADE = 400, total = FADE + (DIGITS.length - 1) * HOP;
+      animate(gCore, [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.5)" }], { duration: 700, easing: EASE.inOut });
+      animate(gVec, [{ opacity: 0, transform: "scale(0.3)" }, { opacity: 1, transform: "scale(1)" }], { duration: 900, delay: 250, easing: EASE.out });
+      const hops = DIGITS.map((_, k) => ({ opacity: 1, transform: tr(k * PITCH, 0), offset: (FADE + k * HOP) / total, easing: EASE.inOut }));
+      animate(winL, [{ opacity: 0, transform: tr(0, 0), offset: 0, easing: EASE.out }, ...hops], { duration: total, delay: 1200, easing: EASE.linear });   // the loop's window steps along, one number at a time
+      animate(winR, pop, { duration: 500, delay: 1700, easing: EASE.pop });                                                                            // the vector unit's window takes all eight at once
+      swapLabel(0, 1, 900);                                    // the breadcrumb stays on core
     }
 
-    if (n === 2) {                                             // the chip shrinks into the CPU; a GPU, a grid of tiny cores, appears
+    if (n === 2) {                                             // the opened core closes, shrinks into the chip, then the other cores light up
+      const T = 500;                                           // the time the opened core takes to close
+      animate(gVec, [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.3)" }], { duration: 600, easing: EASE.inOut });
+      animate(gCore, fade(0, 1), { duration: 600 });
+      animate(gCore, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_CHIP) }], { duration: 900, delay: T, easing: EASE.inOut, fill: "forwards" });
+      animate(gCore, fade(1, 0), { duration: 400, delay: 550 + T, fill: "forwards" });
+      animate(gChip, fade(0, 1), { duration: 500, delay: 250 + T });
+      animate(chip.cores[0].lit, fade(0, 1), { duration: 400, delay: 650 + T });
+      for (let i = 1; i < 14; i++) animate(chip.cores[i].lit, pop, { duration: 400, delay: 1200 + T + (i - 1) * 90, easing: EASE.pop });
+      animate(tag, tagPop, { duration: 450, delay: 2500 + T, easing: EASE.pop });
+      moveCrumb(0, 1, T);
+      swapLabel(1, 2, 600 + T);
+    }
+
+    if (n === 3) {                                             // the chip shrinks into the CPU; a GPU, a grid of tiny cores, appears
       animate(tag, fade(1, 0), { duration: 400 });
       animate(board, fade(0, 1), { duration: 500 });
       animate(gChip, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_COMP) }], { duration: 900, delay: 250, easing: EASE.inOut });
@@ -228,11 +277,11 @@ defineAnimation({
       parts.forEach(p => animate(p, fade(0, 1), { duration: 500, delay: 1200 }));
       bands.forEach((b, i) => animate(b, fade(0, 1), { duration: 450, delay: 1700 + i * 110 }));
       moveCrumb(1, 2);
-      swapLabel(1, 2, 600);
+      swapLabel(2, 3, 600);
       gComp.style.opacity = 1;
     }
 
-    if (n === 3) {                                             // the computer shrinks into a node; the rest of the cluster appears
+    if (n === 4) {                                             // the computer shrinks into a node; the rest of the cluster appears
       parts.forEach(p => animate(p, fade(1, 0), { duration: 400 }));
       animate(gComp, [{ transform: "translate(0px, 0px) scale(1)" }, { transform: zoom(TO_NODE) }], { duration: 1000, delay: 150, easing: EASE.inOut });
       animate(gComp, fade(1, 0), { duration: 400, delay: 800 });
@@ -240,17 +289,17 @@ defineAnimation({
       racks.forEach((r, i) => animate(r, fade(0, 1), { duration: 450, delay: 900 + i * 120 }));
       nodes.forEach((u, i) => animate(u, i === 0 ? fade(0, 1) : pop, i === 0 ? { duration: 400, delay: 800 } : { duration: 400, delay: 1000 + i * 70, easing: EASE.pop }));
       moveCrumb(2, 3);
-      swapLabel(2, 3, 700);
+      swapLabel(3, 4, 700);
     }
 
-    if (n === 4) {                                             // back at the chip: zoom in from the first node's CPU
+    if (n === 5) {                                             // back at the chip: zoom in from the first node's CPU
       animate(gClu, fade(1, 0), { duration: 600 });
       gChip.style.opacity = 1;
       animate(gChip, [{ opacity: 0, transform: zoom(CPU_IN_NODE) }, { opacity: 1, transform: zoom(CPU_IN_NODE), offset: 0.12 }, { opacity: 1, transform: "translate(0px, 0px) scale(1)" }], { duration: 1300, delay: 200, easing: EASE.inOut });
       animate(tag, tagPop, { duration: 450, delay: 1650, easing: EASE.pop });
       moveCrumb(3, 1);
       animate(here, tagPop, { duration: 450, delay: 1850, easing: EASE.pop });
-      swapLabel(3, 1, 1000);
+      swapLabel(4, 2, 1000);
     }
   },
 });

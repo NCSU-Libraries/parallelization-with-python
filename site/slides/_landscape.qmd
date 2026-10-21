@@ -1,0 +1,81 @@
+## Ways to split the work {#landscape}
+
+::: {.cards .two}
+
+::: {.card}
+[Task parallelism]{.card-title}
+**The inputs:** sweeps, ensembles, many files.
+
+`Pool`, `joblib`, job arrays
+:::
+
+::: {.card}
+[Data parallelism]{.card-title}
+**The data:** map-reduce, split-apply-combine.
+
+`Pool.map` plus combine, `Dask DataFrame`, `Polars`, `Spark`
+:::
+
+::: {.card}
+[Domain decomposition]{.card-title}
+**The space:** grids and meshes, with halo exchange (neighbors swap borders).
+
+`mpi4py`, Dask's `map_overlap`, PETSc via `petsc4py`
+:::
+
+::: {.card}
+[Pipelines]{.card-title}
+**The steps:** stages and queues.
+
+`multiprocessing.Queue`, `Dask`, `Snakemake`, `Nextflow`
+:::
+
+:::
+
+## Where the parallelism runs {#landscape-where}
+
+::: {.cards .three}
+
+::: {.card}
+[Vectorizing]{.card-title}
+**One core:** compiled loops over whole arrays.
+
+`NumPy`, `Numba`
+:::
+
+::: {.card}
+[Shared-memory threads]{.card-title}
+**One process:** threads share memory.
+
+Numba `prange`, NumPy's multithreaded math libraries, the optional free-threaded Python 3.13+
+:::
+
+::: {.card}
+[Separate processes]{.card-title}
+**One machine:** each process has its own memory.
+
+`multiprocessing`, `concurrent.futures`, `joblib`
+:::
+
+::: {.card}
+[GPUs]{.card-title}
+**One GPU:** the data across thousands of cores.
+
+`CuPy`, `PyTorch`, `JAX`
+:::
+
+::: {.card}
+[Clusters and message passing]{.card-title}
+**Many machines.**
+
+`mpi4py`, `Dask`, `Ray`, job arrays
+:::
+
+::: {.card .dark}
+[Concurrency for waiting]{.card-title}
+Not parallel computing, but often confused with it.
+
+`threading`, `asyncio`
+:::
+
+:::

@@ -5,6 +5,9 @@ The fire starts in every tree in the left column and spreads to the four
 neighbors (up, down, left, right). We measure the fraction of trees that burn.
 Near a tree density of about 0.59, the outcome flips from "the fire dies out"
 to "the fire sweeps across".
+
+For a forest too big to send between processes, make_rows builds just a band of
+rows from a few numbers, and count_band counts the trees in one band.
 """
 
 import random
@@ -17,6 +20,21 @@ def make_forest(size, density, seed):
     """Return a size x size list of lists. True means a tree."""
     rng = random.Random(seed)
     return [[rng.random() < density for _ in range(size)] for _ in range(size)]
+
+
+def make_rows(size, density, seed, first, count):
+    """Return `count` rows of a size x size forest, starting at row `first`. True means a tree.
+
+    Each row is seeded on its own, from the seed and the row number. So any worker can
+    build any band of rows without building the rows above it. (This is a different
+    forest from make_forest's, which draws every row from one random stream.)
+    """
+    rows = []
+    last = min(first + count, size)  # the last band may be shorter
+    for row in range(first, last):
+        rng = random.Random(seed * 1_000_003 + row)
+        rows.append([rng.random() < density for _ in range(size)])
+    return rows
 
 
 def spread(forest):
@@ -61,6 +79,17 @@ def run(task):
     """Burn one forest for a (density, seed) pair: the one-argument form Pool.map needs."""
     density, seed = task
     return burn(density, seed)
+
+
+def count_band(band):
+    """Count the trees in one band of rows: the one-argument form Pool.map needs.
+
+    band is (size, density, seed, first, count). Those five numbers are all that
+    travels to a worker. It builds its own rows and sends back one count.
+    """
+    size, density, seed, first, count = band
+    rows = make_rows(size, density, seed, first, count)
+    return sum(sum(row) for row in rows)
 
 
 def burn_steps(density, seed, size):
