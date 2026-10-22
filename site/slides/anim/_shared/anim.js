@@ -21,6 +21,9 @@
  *     and keys when standalone.
  *   - The deck bridge, ported from the PhD defense deck: a click inside the iframe gives it the keyboard, so keys are
  *     forwarded to reveal through its postMessage API.
+ *   - Messages up: when a beat settles (its animation is over, or a snap drew it) an embedded page posts
+ *     {type: "beat-done", n} to its parent, n being the beat now on screen; autoplay (the deck's, the review page's Play)
+ *     waits for it. The A key posts {type: "autoplay-toggle"}.
  *   - prefers-reduced-motion: every move snaps.
  *
  * Rules for pages: use only transform, opacity and the like through ctx.animate (the Web Animations API), take colors
@@ -198,6 +201,11 @@
       clearTimeout(r.guard);
     }
 
+    function settled(n) {        // tell the parent that beat n is on screen and at rest
+      if (!embedded) return;
+      try { window.parent.postMessage({ type: "beat-done", n }, "*"); } catch (e) {}
+    }
+
     function finish() {          // end the running enter() now: the beat shows its end state
       const r = run;
       if (!r) return;
@@ -205,6 +213,7 @@
       drop(r);
       def.render(cur, ctx);
       r.done();
+      settled(cur);
     }
 
     function snap(n) {
@@ -212,6 +221,7 @@
       cur = n;
       def.render(n, ctx);
       label();
+      settled(n);
     }
 
     function step(n) {           // n is cur + 1
@@ -225,6 +235,7 @@
         console.error(err);
         run = null; drop(r); r.done();
         def.render(n, ctx); label();
+        settled(n);
         return;
       }
       label();
@@ -283,6 +294,10 @@
       else if (k === "ArrowRight" || (k === " " && !e.shiftKey)) dir = 1;
       else if (k === "ArrowLeft" || (k === " " && e.shiftKey)) dir = -1;
       else if (k === "Escape" && embedded) { send("toggleOverview"); return; }
+      else if (embedded && (k === "a" || k === "A") && !e.shiftKey) {        // autoplay on/off: the deck decides
+        if (!e.repeat) { try { window.parent.postMessage({ type: "autoplay-toggle" }, "*"); } catch (err) {} }
+        return;
+      }
       else if (!embedded && k === "Home") { e.preventDefault(); show(0, true); return; }
       else if (!embedded && k === "End") { e.preventDefault(); show(beats, true); return; }
       else return;

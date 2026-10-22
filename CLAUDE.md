@@ -97,6 +97,12 @@ It uses no external JavaScript libraries: SVG, CSS and the Web Animations API on
 - **Deck bridge:** when the iframe has focus, it forwards PageDown/PageUp/N/P and the arrow keys to the deck through
   Reveal's postMessage API, so a click inside an animation never traps the keyboard. This is ported from the defense
   deck.
+- **Autoplay (off by default):** when a beat settles (an animated beat finishes, or a snap is drawn), an embedded page
+  posts `{type: "beat-done", n}` to its parent. A toggles autoplay in the deck (from inside an animation it posts
+  `{type: "autoplay-toggle"}`), and `?autoplay` or `?autoplay=2500` (the pause in ms; default 1500) turns it on for the
+  visit. On an animation slide it then shows the next fragment one pause after each `beat-done`, never changes slides,
+  and a manual step back pauses it until the slide changes. A "▶ autoplay" pill shows while it is on. The key is
+  A, not G, because G is reveal's "jump to slide". The review page's Play button uses the same `beat-done`.
 - **Reduced motion:** with `prefers-reduced-motion`, beats jump to their end states.
 - **Legible over Zoom:**
   - labels are at least 20 px at stage scale, with bold shapes and no hairlines;
