@@ -33,9 +33,6 @@
   .card pre { position: absolute; left: 28px; margin: 0; font: 400 24px/1.5 var(--mono); white-space: pre; font-variant-ligatures: none; opacity: 0; }
   .card .fn, .card .ar { color: var(--red-soft); }
   .card b { font-weight: 700; }
-  #cdCall { top: 22px; }
-  #cdNote { top: 70px; font-size: 22px; color: var(--overhead); }
-  #cdRet  { top: 60px; font: 400 34px/1.25 var(--mono); }
   .card pre.cd-tri { font-size: 22px; line-height: 33px; }
   #cdBig  { left: 0; right: 0; top: 34px; text-align: center; font: 700 48px/1.2 var(--mono); }
   .cd-tri .rv { opacity: 0; }                       /* a call's return value appears when it lands */
@@ -43,23 +40,12 @@
   .badge i { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--paper); }
   .badge.done { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 3px var(--line); }
 
-  #counter1 { left: 712px; top: 250px; font-variant-numeric: tabular-nums; }
-  #counter1 small { display: block; margin-bottom: 12px; font: 700 36px/1.2 var(--font); color: var(--muted); }   /* the big number's glyph box reaches above its line */
-  #counter1 b { display: block; font: 800 112px/1.05 var(--font); color: var(--red); letter-spacing: -2px; }
-
   .flabel { font: 800 30px/1.1 var(--font); color: var(--ink); text-align: center; width: 256px; }
   .flabel span { color: var(--muted); font-weight: 600; }
   .fcount { font: 700 30px/1.1 var(--font); color: var(--ink); text-align: center; width: 256px; font-variant-numeric: tabular-nums; }
   .fcount b { color: var(--red); font-weight: 800; }
 
-  .legend { position: absolute; left: 712px; top: 430px; display: grid; grid-template-columns: 230px 250px; gap: 14px 24px; font: 600 24px/1 var(--font); color: var(--ink); white-space: nowrap; opacity: 0; }
-  .legend span { display: flex; align-items: center; gap: 12px; }
-  .legend i { display: block; width: 30px; height: 30px; border-radius: 8px; }
-  .sw-tree { background: var(--tree); } .sw-bare { background: var(--ground); box-shadow: inset 0 0 0 3px var(--line); }
-  .sw-front { background: var(--hunt); } .sw-burn { background: var(--flame); } .sw-ash { background: var(--ash); }
-
   .small { font: 600 24px/1.2 var(--font); color: var(--muted); }
-  #sp0 { left: 52px; top: 558px; }
   #note2 { left: 52px; top: 110px; width: 620px; white-space: normal; font: 600 28px/1.25 var(--font); color: var(--muted); }
   #sp2 { left: 52px; top: 152px; }
   #mzNote { left: 52px; top: 536px; }
@@ -87,20 +73,12 @@
 
   <div class="card" id="card" aria-hidden="true">
     <span class="badge" id="badge"></span>
-    <pre id="cdCall"></pre>
-    <pre id="cdNote"></pre>
-    <pre id="cdRet"></pre>
     <pre class="cd-tri" id="cdTri0" style="top: 14px"></pre>
     <pre class="cd-tri" id="cdTri1" style="top: 47px"></pre>
     <pre class="cd-tri" id="cdTri2" style="top: 80px"></pre>
     <pre id="cdBig"></pre>
   </div>
 
-  <p class="t" id="counter1" aria-hidden="true"><small>burned:</small><b>0%</b></p>
-  <div class="legend" id="legend" aria-hidden="true">
-    <span><i class="sw-tree"></i>tree</span><span><i class="sw-bare"></i>bare ground</span><span><i class="sw-front"></i>fire front</span><span><i class="sw-burn"></i>burning</span><span><i class="sw-ash"></i>burnt</span>
-  </div>
-  <p class="t small" id="sp0" aria-hidden="true"></p>
   <p class="t" id="note2" aria-hidden="true">Three calls. Same seed, three tree densities.</p>
   <p class="t small" id="sp2" aria-hidden="true"></p>
   <p class="t small" id="mzNote" aria-hidden="true">one tile = one call; the darker, the more of the forest burned</p>
@@ -210,14 +188,13 @@ function burn(f, animate, later, lead, setPct) {
 }
 
 // ---- setup: draws the page from the data ------------------------------------------------------------------------------------
-let big, link, trio = [], mosaic = [], sweepInfo, plot = {}, num = {};
+let trio = [], mosaic = [], sweepInfo, plot = {}, num = {};
 const mz = {}, pl = {};                          // the geometry of the mosaic (beat 3) and of the plot (beat 4)
 const el = {};                                   // the page's own elements, by name
 
 function setup(ctx, [fireRuns, sweep, scaling]) {
   C = { tree: tok("--tree"), hunt: tok("--hunt"), flame: tok("--flame"), ash: tok("--ash"), ground: tok("--ground"), red: tok("--red") };
   const runs = fireRuns.runs.map(r => Object.assign({ size: fireRuns.size }, r));
-  const sixty = runs.reduce((a, r) => (Math.abs(r.density - 0.6) < Math.abs(a.density - 0.6) ? r : a));
   const dens = sweep.densities, per = sweep.seeds_per_density, total = sweep.results.length;
   const rows = {};                                // density -> burned fractions by seed
   for (const [d, seed, fr] of sweep.results) (rows[d] ||= [])[seed] = fr;
@@ -235,21 +212,17 @@ function setup(ctx, [fireRuns, sweep, scaling]) {
   sweepInfo = { total, nd: dens.length, per };
 
   // the card. The code is literally true: burn(density, seed, size=450) in code/fire.py, called here with size=64.
-  const call = r => `<span class="fn">burn</span>(${r.density.toFixed(2)}, seed=${fireRuns.seed}, size=${fireRuns.size})`;
   const tri = r => `<span class="fn">burn</span>(${r.density.toFixed(2)}, ${fireRuns.seed}, size=${fireRuns.size}) <span class="rv"><span class="ar">→</span> <b>${r.burned_fraction.toFixed(2)}</b></span>`;
-  for (const id of ["card", "badge", "cdCall", "cdNote", "cdRet", "cdTri0", "cdTri1", "cdTri2", "cdBig", "counter1", "legend", "sp0", "note2", "sp2", "mzNote", "serial", "banner", "tip"]) el[id] = $(id);
+  for (const id of ["card", "badge", "cdTri0", "cdTri1", "cdTri2", "cdBig", "note2", "sp2", "mzNote", "serial", "banner", "tip"]) el[id] = $(id);
   el.caps = [0, 1, 2, 3, 4].map(i => $("cap" + i));
   el.tri = [0, 1, 2].map(i => $("cdTri" + i));
-  el.cdCall.innerHTML = call(sixty);
-  el.cdNote.textContent = "# a random forest, " + Math.round(sixty.density * 100) + "% trees";
-  el.cdRet.innerHTML = `<span class="ar">→</span> <b>${sixty.burned_fraction.toFixed(2)}</b>`;
   runs.slice(0, 3).forEach((r, i) => { el.tri[i].innerHTML = tri(r); });
   num.small = `shown ${fireRuns.size} × ${fireRuns.size}; the real runs are ${num.real} × ${num.real}`;
-  el.sp0.textContent = el.sp2.textContent = num.small;
+  el.sp2.textContent = num.small;
   el.serial.querySelector("b").textContent = `about ${num.serial} s`;
   el.banner.innerHTML = `Next: the same ${fmt(total)} runs on <b>${num.cores} cores</b>.`;
   el.tip.querySelector("small").textContent = `near ${num.tip}% trees`;
-  el.caps[0].innerHTML = "<b>One run of a simulation is one function call.</b>";
+  el.caps[0].innerHTML = "<b>Three calls: the same simulation at three tree densities.</b>";
   el.caps[1].innerHTML = `<b>It returns one number: the fraction of trees burned.</b><span>The workshop’s runs use ${num.real} × ${num.real} forests: about ${num.ms} ms each.</span>`;
   el.caps[2].innerHTML = "<b>Different inputs, different answers.</b><b>To see the pattern, run it many times.</b>";
   el.caps[3].innerHTML = `<b>${dens.length} densities × ${per} seeds = ${fmt(total)} runs.</b><b>No run needs another’s result: <em>embarrassingly parallel</em>.</b>`;
@@ -257,13 +230,7 @@ function setup(ctx, [fireRuns, sweep, scaling]) {
   num.callsOf = k => `${fmt(k)} calls`;
   el.cdBig.textContent = num.callsOf(total);
 
-  // beats 0 and 1: one forest, drawn large
-  big = buildForest(art, sixty, 7, 52, 104);
-  big.g.style.opacity = 0;
-  link = svg("path", { class: "arrow", d: "M696 178 H524 M542 160 L522 178 L542 196" }, art);   // from the call to the forest it burns
-  link.style.opacity = 0;
-
-  // beat 2: the three forests side by side, same seed
+  // beats 0 and 1: the three forests side by side, same seed
   const side = 64 * 4, gap = 140;
   runs.slice(0, 3).forEach((r, i) => {
     const x = 52 + i * (side + gap), y = 282;
@@ -275,12 +242,12 @@ function setup(ctx, [fireRuns, sweep, scaling]) {
     trio.push(f);
   });
 
-  // beat 3: the mosaic, at the left of the card: a tile per run, a column per density
+  // beat 2: the mosaic, at the left of the card: a tile per run, a column per density
   Object.assign(mz, { x0: 64, y0: 108, colPitch: 29, tileW: 25, rowPitch: 8, tileH: 6 });
   mz.w = dens.length * mz.colPitch - (mz.colPitch - mz.tileW);
   mz.h = per * mz.rowPitch - (mz.rowPitch - mz.tileH);
   mz.colX = i => mz.x0 + mz.tileW / 2 + i * mz.colPitch;
-  // beat 4: the same tiles, flown to the plot. Smaller than the first version, to leave room for the words below it.
+  // beat 3: the same tiles, flown to the plot. Smaller than the first version, to leave room for the words below it.
   Object.assign(pl, { colPitch: 46, fy0: 112, fh: 340 });
   pl.w = dens.length * pl.colPitch - 4;
   pl.x0 = (1280 - pl.w) / 2 + 16;                // a little right of center: the axis labels sit at its left
@@ -339,9 +306,8 @@ function setup(ctx, [fireRuns, sweep, scaling]) {
   const pc = r => Math.round(r.density * 100), fr2 = r => r.burned_fraction.toFixed(2);
   const three = runs.slice(0, 3), list = a => a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
   DEF.alt = [
-    `A forest ${fireRuns.size} cells across with ${pc(sixty)}% trees stands beside a code card that reads burn(${sixty.density.toFixed(2)}, seed=${fireRuns.seed}, size=${fireRuns.size}), because one run of a simulation is one function call.`,
-    `The fire spreads through the forest while the burned counter climbs, and the call returns one number, ${fr2(sixty)}, the fraction of trees burned, from a run that takes about ${num.ms} milliseconds at the workshop's real ${num.real} by ${num.real} size.`,
-    `Three calls with the same seed and tree densities of ${list(three.map(pc))} percent burn together and return ${list(three.map(fr2))}, so different inputs give different answers and seeing the pattern means running it many times.`,
+    `Three forests ${fireRuns.size} cells across, with ${list(three.map(pc))} percent trees, stand unburned above a code card with three calls of burn with the same seed and the three densities.`,
+    `The three fires burn together and the calls return ${list(three.map(fr2))}, so different inputs give different answers and seeing the pattern means running it many times; one run takes about ${num.ms} milliseconds at the workshop's real ${num.real} by ${num.real} size.`,
     `The sweep is ${dens.length} densities times ${per} seeds, ${fmt(total)} calls drawn as tiles with one column per density, and because no call needs another's result it is embarrassingly parallel and takes about ${num.serial} seconds one after another.`,
     `The tiles become dots on a plot of the fraction of trees burned against tree density, with a red mean line that rises steeply at the tipping point near ${num.tip}% trees, and a banner says the same ${fmt(total)} runs come next on ${num.cores} cores.`,
   ];
@@ -359,8 +325,6 @@ function monotone(p) {
 }
 
 // ---- states -------------------------------------------------------------------------------------------------------------------
-const counterB = () => el.counter1.querySelector("b");
-const setCounter = p => { counterB().textContent = pctText(p); };
 const setTrio = (i, p) => { trio[i].count.innerHTML = `burned: <b>${pctText(p)}</b>`; };
 function setBadge(state) {                       // "running", "done", or nothing
   el.badge.className = "badge " + state;
@@ -368,41 +332,33 @@ function setBadge(state) {                       // "running", "done", or nothin
 }
 const rvs = () => el.tri.map(r => r.querySelector(".rv"));
 
+const CAP = [0, 2, 3, 4];                        // the caption element each beat uses
+
 const DEF = {
-  beats: 4,
+  beats: 3,
   alt: [],                                       // filled in by setup, from the data
 
   load: () => Promise.all([Anim.loadJSON("data/fire-runs.json"), Anim.loadJSON("data/sweep.json"), Anim.loadJSON("data/scaling.json")]),
   setup,
 
-  render(n) {
+  render(beat) {
+    const n = beat === 0 ? 2 : beat + 1;           // the old numbering of this page: 2 the three forests, 3 the mosaic, 4 the plot
     const T = sweepInfo.total;
-    // one forest
-    big.g.style.opacity = n <= 1 ? 1 : 0;
-    (n >= 1 ? endForest : startForest)(big);
-    op(el.counter1, n === 1 ? 1 : 0);
-    setCounter(n >= 1 ? big.final : 0);
-    op(el.legend, n <= 1 ? 1 : 0);
-    op(link, n <= 1 ? 1 : 0);
-    op(el.sp0, n <= 1 ? 1 : 0);
     // the card
     op(el.card, n <= 3 ? 1 : 0);
-    op(el.cdCall, n <= 1 ? 1 : 0);
-    op(el.cdNote, n === 0 ? 1 : 0);
-    op(el.cdRet, n === 1 ? 1 : 0);
     el.tri.forEach(r => op(r, n === 2 ? 1 : 0));
-    rvs().forEach(r => op(r, 1));
+    rvs().forEach(r => op(r, beat === 0 ? 0 : 1));
     op(el.cdBig, n === 3 ? 1 : 0);
     el.cdBig.textContent = num.callsOf(T);
-    setBadge(n === 1 || n === 2 ? "done" : "");
-    op(el.badge, n === 1 || n === 2 ? 1 : 0);
+    setBadge(beat === 1 ? "done" : "");
+    op(el.badge, beat === 1 ? 1 : 0);
     // three forests
     trio.forEach((f, i) => {
       f.g.style.opacity = n === 2 ? 1 : 0;
-      (n === 2 ? endForest : startForest)(f);
+      (beat === 1 ? endForest : startForest)(f);
       op(f.top, n === 2 ? 1 : 0);
       op(f.count, n === 2 ? 1 : 0);
-      setTrio(i, n === 2 ? f.final : 0);
+      setTrio(i, beat === 1 ? f.final : 0);
     });
     op(el.note2, n === 2 ? 1 : 0);
     op(el.sp2, n === 2 ? 1 : 0);
@@ -421,53 +377,32 @@ const DEF = {
     op(plot.arrow, n === 4 ? 1 : 0);
     op(el.tip, n === 4 ? 1 : 0);
     // the words
-    el.caps.forEach((c, i) => op(c, i === n ? 1 : 0));
+    el.caps.forEach((c, i) => op(c, i === CAP[beat] ? 1 : 0));
     op(el.banner, n === 4 ? 1 : 0);
   },
 
-  enter(n, { animate, later }) {
+  enter(beat, { animate, later }) {
+    const n = beat + 1;                          // the old numbering: 2 the burn, 3 the mosaic, 4 the plot
     const fade = (a, b) => [{ opacity: a }, { opacity: b }];
     const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
     const out = (els, ms = 400) => els.forEach(e => animate(e, fade(1, 0), { duration: ms }));
-    const words = () => { animate(el.caps[n - 1], fade(1, 0), { duration: 350 }); animate(el.caps[n], rise(10), { duration: 550, delay: 250 }); };
+    const words = () => { animate(el.caps[CAP[beat - 1]], fade(1, 0), { duration: 350 }); animate(el.caps[CAP[beat]], rise(10), { duration: 550, delay: 250 }); };
 
-    if (n === 1) {
-      startForest(big);
-      setCounter(0);
-      animate(el.counter1, rise(12), { duration: 500 });
+    if (n === 2) {
       words();
       setBadge("running");
       animate(el.badge, fade(0, 1), { duration: 400, delay: 200 });
-      const end = burn(big, animate, later, 400, setCounter);
-      // the call returns when the fire is out: the comment gives way to the return value
-      const t = end - 400;
-      animate(el.cdNote, fade(1, 0), { duration: 350, delay: t });
-      animate(el.cdRet, rise(10), { duration: 500, delay: t + 200 });
-      later(t + 250, () => setBadge("done"));
-    }
-
-    if (n === 2) {
-      animate(big.g, fade(1, 0), { duration: 450 });
-      out([el.counter1, el.legend, el.sp0, el.cdCall, el.cdRet, link]);
-      words();
-      setBadge("running");
       let last = 0;
       trio.forEach((f, i) => {
         startForest(f);
         setTrio(i, 0);
-        animate(f.g, fade(0, 1), { duration: 600, delay: 250 });
-        animate(f.top, rise(10), { duration: 500, delay: 450 });
-        animate(f.count, rise(10), { duration: 500, delay: 450 });
-        burn(f, animate, later, 850, p => setTrio(i, p));
+        burn(f, animate, later, 400, p => setTrio(i, p));
         // a call lands on its own time: when its fire has spread as far as it will
-        const t = 850 + f.run.steps * DT + 120;
-        animate(el.tri[i], rise(8), { duration: 450, delay: 350 + i * 130 });
+        const t = 400 + f.run.steps * DT + 120;
         animate(rvs()[i], fade(0, 1), { duration: 450, delay: t });
         last = Math.max(last, t);
       });
       later(last + 250, () => setBadge("done"));
-      animate(el.note2, rise(10), { duration: 500, delay: 350 });
-      animate(el.sp2, rise(10), { duration: 500, delay: 500 });
     }
 
     if (n === 3) {

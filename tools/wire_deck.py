@@ -28,6 +28,7 @@ SITE = ROOT / "site/_site"
 # slide id in the deck -> animation page, in deck order
 SLIDES = {
     "anim-cores": "cores.html",
+    "anim-example": "example.html",
     "anim-lanes-primer": "lanes-primer.html",
     "anim-split": "split.html",
     "anim-talk": "talk.html",

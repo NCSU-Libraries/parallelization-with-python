@@ -73,7 +73,23 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 ::: {.fragment}
 :::
 
-[Text alternative: A processor with 14 cores: 10 large performance cores (P) and 4 smaller efficiency cores (E). All 14 are idle. A loop, for forest in forests: burn(forest), starts running. Exactly one core lights up. The meter reads 1 of 14 cores busy, 7%. The other 13 cores are idle, shown with dashed outlines, and a callout says 13 cores waiting. All 14 cores light up. The meter reads 14 of 14 busy, 100%. The caption says: This workshop: how to use the rest. The code card leaves, the chip moves left, and a card titled Yours? appears with the code import os and os.cpu_count() and three rows: this laptop 14, Google Colab 2, and yours with a question mark.]{.visually-hidden}
+[Text alternative: A processor with 14 cores: 10 large performance cores (P) and 4 smaller efficiency cores (E). All 14 are idle. A code card tagged a fire simulation shows a loop, for forest in forests: burn(forest), that starts running. Exactly one core lights up. The meter reads 1 of 14 cores busy, 7%. The other 13 cores are idle, shown with dashed outlines, and a callout says 13 cores waiting. All 14 cores light up. The meter reads 14 of 14 busy, 100%. The caption says: This workshop: how to use the rest. The code card leaves, the chip moves left, and a card titled Yours? appears with the code import os and os.cpu_count() and three rows: this laptop 14, Google Colab 2, and yours with a question mark.]{.visually-hidden}
+
+## Our example: a forest-fire simulation {#anim-example data-state="anim-slide" background-iframe="anim/example.html" background-interactive="true"}
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+::: {.fragment}
+:::
+
+[Text alternative: The question: how dense can a forest be before a fire can cross it? You can't test that by burning real forests, so we simulate it. A forest 64 cells across with 60 percent trees sits beside three rules: trees are scattered at random, 60 percent of the cells; fire starts in every tree on the left edge; each step it spreads to the four neighboring trees. The fire spreads through the forest while the burned counter climbs to 56 percent, and a code card reads burn(0.60, seed=28, size=64) returning 0.56: one run is one function call, and it returns one number, the fraction of trees burned. 48 dots on a zero to 100 percent axis of trees burned show 48 random forests at 60 percent trees, with 48 different answers, so to trust the answer you run it many times, at every density. 21 densities times 48 forests is 1,008 runs, and none needs another's result. Fire scientists run far richer models, thousands of times; ours keeps one idea, fire jumps from tree to tree. Your own simulations have the same shape: one model, many settings.]{.visually-hidden}
 
 # The landscape {.divider background-color="#CC0000"}
 
@@ -107,7 +123,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 ::: {.fragment}
 :::
 
-[Text alternative: Four gray labels sit in a row under the title: the inputs, the data, the space and the steps. The inputs: three whole forests with 45, 60 and 75 percent trees go to workers W1, W2 and W3, one forest each, like the 1,008-forest sweep. The data: the 60 percent forest is cut into four bands of 16 rows for workers W1 to W4, each band shows its tree count (610, 595, 623, 617), and the four counts slide together into one total of 2,445 trees. The space: the same banded forest burns, and small two-way ticks flash on the band edges where the fire crosses, because each worker owns a region and neighbors trade their edges every step, which is domain decomposition. The steps: three stage boxes, make a forest, burn it and summarize, belong to workers W1, W2 and W3, and small forest tiles pass through them one after another until each ends as a number (0.08, 0.56, 0.99), which is a pipeline. All four ways to split the problem sit small in a 2 by 2 grid, with the inputs outlined in red and tagged today's demo.]{.visually-hidden}
+[Text alternative: Four gray labels sit in a row under the title: the inputs, the data, the space and the steps. The inputs: three whole forests with 45, 60 and 75 percent trees go to workers W1, W2 and W3, one forest each, so each worker gets whole simulation runs, like the 1,008-run sweep. The data: the 60 percent forest is cut into four bands of 16 rows for workers W1 to W4, each band shows its tree count (610, 595, 623, 617), and the four counts slide together into one total of 2,445 trees. The space: the same banded forest burns, and small two-way ticks flash on the band edges where the fire crosses, because each worker owns a region and neighbors trade their edges every step, which is domain decomposition. The steps: three stage boxes, make a forest, burn it and summarize, belong to workers W1, W2 and W3, and small forest tiles pass through them one after another until each ends as a number (0.08, 0.56, 0.99), which is a pipeline. All four ways to split the problem sit small in a 2 by 2 grid, with the inputs outlined in red and tagged today's demo.]{.visually-hidden}
 
 ## Question 2: How often do the pieces talk? {#anim-talk data-state="anim-slide" background-iframe="anim/talk.html" background-interactive="true"}
 
@@ -248,10 +264,7 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 ::: {.fragment}
 :::
 
-::: {.fragment}
-:::
-
-[Text alternative: A forest 64 cells across with 60% trees stands beside a code card that reads burn(0.60, seed=28, size=64), because one run of a simulation is one function call. The fire spreads through the forest while the burned counter climbs, and the call returns one number, 0.56, the fraction of trees burned, from a run that takes about 40 milliseconds at the workshop's real 450 by 450 size. Three calls with the same seed and tree densities of 45, 60 and 75 percent burn together and return 0.08, 0.56 and 0.99, so different inputs give different answers and seeing the pattern means running it many times. The sweep is 21 densities times 48 seeds, 1,008 calls drawn as tiles with one column per density, and because no call needs another's result it is embarrassingly parallel and takes about 37 seconds one after another. The tiles become dots on a plot of the fraction of trees burned against tree density, with a red mean line that rises steeply at the tipping point near 59% trees, and a banner says the same 1,008 runs come next on 14 cores.]{.visually-hidden}
+[Text alternative: Three forests 64 cells across, with 45, 60 and 75 percent trees, stand unburned above a code card with three calls of burn with the same seed and the three densities. The three fires burn together and the calls return 0.08, 0.56 and 0.99, so different inputs give different answers and seeing the pattern means running it many times; one run takes about 40 milliseconds at the workshop's real 450 by 450 size. The sweep is 21 densities times 48 seeds, 1,008 calls drawn as tiles with one column per density, and because no call needs another's result it is embarrassingly parallel and takes about 37 seconds one after another. The tiles become dots on a plot of the fraction of trees burned against tree density, with a red mean line that rises steeply at the tipping point near 59% trees, and a banner says the same 1,008 runs come next on 14 cores.]{.visually-hidden}
 
 ## 1 worker vs. 14 workers {#anim-replay data-state="anim-slide" background-iframe="anim/replay.html" background-interactive="true"}
 

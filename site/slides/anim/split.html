@@ -335,7 +335,7 @@ function setup(ctx, [fireRuns, sweep]) {
 
   // the words under each beat
   const cap = html_ => html("p", { class: "cap", html: html_ }, stage);
-  caps.push(cap(`<b>Split the inputs:</b> each worker gets whole runs, like our ${fmt(sweepSize)}-forest sweep.`));
+  caps.push(cap(`<b>Split the inputs:</b> each worker gets whole simulation runs, like our ${fmt(sweepSize)}-run sweep.`));
   caps.push(cap("<b>Split the data:</b> each worker takes a slice of one big dataset, and the answers are combined."));
   caps.push(cap("<b>Split the space:</b> each worker owns a region, and neighbors trade their edges every step. This is <em>domain decomposition</em>."));
   caps.push(cap("<b>Split the steps:</b> each worker does one step for every item. A <em>pipeline</em>."));
@@ -343,7 +343,7 @@ function setup(ctx, [fireRuns, sweep]) {
 
   // the text alternative of each beat
   alt.push("Four gray labels sit in a row under the title: the inputs, the data, the space and the steps.");
-  alt.push(`The inputs: three whole forests with ${sayList(runs.slice(0, 3).map(pct))} percent trees go to workers W1, W2 and W3, one forest each, like the ${fmt(sweepSize)}-forest sweep.`);
+  alt.push(`The inputs: three whole forests with ${sayList(runs.slice(0, 3).map(pct))} percent trees go to workers W1, W2 and W3, one forest each, so each worker gets whole simulation runs, like the ${fmt(sweepSize)}-run sweep.`);
   alt.push(`The data: the ${pct(sixty)} percent forest is cut into four bands of ${BAND} rows for workers W1 to W4, each band shows its tree count (${counts.join(", ")}), and the four counts slide together into one total of ${fmt(sum)} trees.`);
   alt.push("The space: the same banded forest burns, and small two-way ticks flash on the band edges where the fire crosses, because each worker owns a region and neighbors trade their edges every step, which is domain decomposition.");
   alt.push(`The steps: three stage boxes, make a forest, burn it and summarize, belong to workers W1, W2 and W3, and small forest tiles pass through them one after another until each ends as a number (${runs.slice(0, 3).map(r => r.burned_fraction.toFixed(2)).join(", ")}), which is a pipeline.`);

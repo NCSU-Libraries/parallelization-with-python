@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Our example: a forest-fire simulation</title>
+<link rel="stylesheet" href="_shared/anim.css">
+<style>
+  /* A1b: what the example is, and why it is simulated. One forest, one run, many runs, then the shape of the problem.
+     The data is data/fire-runs.json (the 64 x 64 forest, seed 28) and data/sweep.json (the real runs). */
+  .forest path, .forest rect { shape-rendering: crispEdges; }
+  .f-ground { fill: var(--ground); }
+  .f-tree   { fill: var(--tree); }
+  .f-frame  { fill: none; stroke: var(--line); stroke-width: 4; }
+  .axis     { stroke: var(--overhead); stroke-width: 4; stroke-linecap: round; }
+  .tick-l   { font: 600 24px var(--font); fill: var(--muted); }
+  .axis-t   { font: 600 26px var(--font); fill: var(--muted); }
+  .dot      { opacity: 0; }
+
+  .t { position: absolute; margin: 0; opacity: 0; }
+
+  /* beat 0: the question */
+  #q { left: 80px; right: 80px; top: 200px; text-align: center; }
+  #q b { display: block; font: 800 66px/1.2 var(--font); color: var(--ink); }
+  #q span { display: block; margin-top: 36px; font: 600 36px/1.3 var(--font); color: var(--muted); }
+
+  /* beat 1: the model */
+  #fnote { left: 52px; top: 560px; font: 600 24px/1.2 var(--font); color: var(--muted); }
+  #rules { left: 590px; top: 128px; width: 640px; }
+  .rule { position: absolute; left: 0; width: 640px; display: flex; gap: 22px; align-items: flex-start; opacity: 0; font: 700 32px/1.3 var(--font); color: var(--ink); }
+  .rule i { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--red); color: var(--paper); font: 800 30px/52px var(--font); text-align: center; font-style: normal; }
+  .rule em { font-style: normal; color: var(--red); }
+
+  /* beat 2: one run, one call */
+  .card { position: absolute; left: 640px; top: 120px; width: 592px; height: 140px; background: var(--ink); color: var(--paper); border-radius: 22px; opacity: 0; }
+  .card pre { position: absolute; left: 28px; margin: 0; font: 400 26px/1.4 var(--mono); white-space: pre; font-variant-ligatures: none; }
+  .card .fn, .card .ar { color: var(--red-soft); }
+  #cdCall { top: 24px; }
+  #cdRet  { top: 72px; font-size: 40px; opacity: 0; }
+  #cdRet b { font-weight: 700; }
+  #counter { left: 640px; top: 296px; font-variant-numeric: tabular-nums; }
+  #counter small { display: block; margin-bottom: 10px; font: 700 36px/1.2 var(--font); color: var(--muted); }
+  #counter b { display: block; font: 800 120px/1.05 var(--font); color: var(--red); letter-spacing: -2px; }
+
+  /* beat 3: many runs */
+  #phead { left: 52px; top: 112px; font: 800 34px/1.2 var(--font); color: var(--ink); }
+  #phead span { color: var(--muted); font-weight: 600; }
+
+  /* beat 4: the shape of the problem */
+  #eq   { left: 48px; right: 48px; top: 140px; text-align: center; font: 800 56px/1.2 var(--font); color: var(--ink); }
+  #eq em { font-style: normal; color: var(--red); }
+  #indep { left: 48px; right: 48px; top: 226px; text-align: center; font: 700 36px/1.3 var(--font); color: var(--muted); }
+  #sci  { left: 120px; right: 120px; top: 330px; text-align: center; font: 600 28px/1.4 var(--font); color: var(--muted); }
+  #own  { left: 48px; right: 48px; top: 500px; text-align: center; font: 800 34px/1.3 var(--font); color: var(--ink); }
+  #own em { font-style: normal; color: var(--red); }
+
+  .cap { position: absolute; left: 52px; right: 48px; bottom: 52px; margin: 0; opacity: 0; }
+  .cap b { display: block; font: 800 30px/1.2 var(--font); color: var(--ink); }
+  .cap span { display: block; margin-top: 4px; font: 600 27px/1.2 var(--font); color: var(--muted); }
+</style>
+</head>
+<body>
+<main id="stage" class="stage" role="img" aria-label="">
+  <h1 class="title">Our example: a forest-fire simulation</h1>
+  <svg class="art" id="art" viewBox="0 0 1280 720" aria-hidden="true"></svg>
+
+  <p class="t" id="q" aria-hidden="true"><b>How dense can a forest be before a fire can cross it?</b><span>You can’t test that by burning real forests, so we simulate it.</span></p>
+
+  <p class="t" id="fnote" aria-hidden="true"></p>
+  <div class="t" id="rules" aria-hidden="true">
+    <div class="rule" style="top: 0"><i>1</i><span id="r1"></span></div>
+    <div class="rule" style="top: 130px"><i>2</i><span>Fire starts in every tree on the <em>left edge</em>.</span></div>
+    <div class="rule" style="top: 260px"><i>3</i><span>Each step, it spreads to the <em>four neighboring</em> trees.</span></div>
+  </div>
+
+  <div class="card" id="card" aria-hidden="true">
+    <pre id="cdCall"></pre>
+    <pre id="cdRet"></pre>
+  </div>
+  <p class="t" id="counter" aria-hidden="true"><small>burned:</small><b>0%</b></p>
+
+  <p class="t" id="phead" aria-hidden="true"></p>
+
+  <p class="t" id="eq" aria-hidden="true"></p>
+  <p class="t" id="indep" aria-hidden="true">None needs another’s result.</p>
+  <p class="t" id="sci" aria-hidden="true">Fire scientists run far richer models, with wind, terrain and fuel, thousands of times to map where fires are likely to spread. Ours keeps one idea: fire jumps from tree to tree.</p>
+  <p class="t" id="own" aria-hidden="true">Your own simulations have the same shape: <em>one model, many settings</em>.</p>
+
+  <p class="cap" id="cap2" aria-hidden="true"></p>
+  <p class="cap" id="cap3" aria-hidden="true"></p>
+</main>
+
+<script src="_shared/anim.js"></script>
+<script>
+"use strict";
+const { svg, tok, EASE } = Anim;
+
+const f2 = v => +v.toFixed(2);
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => "#" + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+const fmt = n => n.toLocaleString("en-US");
+const $ = id => document.getElementById(id);
+const op = (el, v) => { el.style.opacity = v; el.style.transform = ""; };
+
+const DT = 36;                                  // ms per breadth-first step
+const FRONT = 3, BURN = 9, ASH_FADE = 3;        // steps a cell stays yellow, then orange; steps it takes to go dark
+const LIFE = FRONT + BURN + ASH_FADE;
+
+const art = $("art");
+let C, big, dots = [], plotG, num = {};
+const el = {};
+
+// ---- the forest: the base layer is every tree; one overlay per burn step sits on top and changes color ----------------------
+const pathOf = (runs, cell) => runs.map(([c, r, n]) => `M${f2(c * cell)} ${f2(r * cell)}h${f2(n * cell)}v${f2(cell)}h${f2(-n * cell)}z`).join("");
+function rowRuns(idx, size) {                    // row-major cell indexes -> [col, row, length] runs
+  const merged = [];
+  for (const i of idx.sort((a, b) => a - b)) {
+    const r = Math.floor(i / size), c = i % size, last = merged[merged.length - 1];
+    if (last && last[1] === r && last[0] + last[2] === c) last[2]++; else merged.push([c, r, 1]);
+  }
+  return merged;
+}
+function buildForest(parent, run, cell, ox, oy) {
+  const size = run.size, cells = run.cells, side = size * cell;
+  const g = svg("g", { class: "forest" }, parent);
+  g.style.transform = `translate(${ox}px, ${oy}px)`;
+  svg("rect", { class: "f-ground", width: side, height: side }, g);
+  const all = []; cells.forEach((v, i) => { if (v !== -2) all.push(i); });
+  svg("path", { class: "f-tree", d: pathOf(rowRuns(all, size), cell) }, g);
+  const byStep = new Map(), steps = [], cum = [];
+  cells.forEach((v, i) => { if (v >= 0) { if (!byStep.has(v)) byStep.set(v, []); byStep.get(v).push(i); } });
+  let total = 0;
+  for (let k = 0; k <= run.steps; k++) {
+    const idx = byStep.get(k) || [];
+    total += idx.length; cum.push(total);
+    if (!idx.length) continue;
+    const path = svg("path", { d: pathOf(rowRuns(idx, size), cell) }, g);
+    path.style.fill = C.tree;
+    steps.push({ k, path });
+  }
+  svg("rect", { class: "f-frame", x: -2, y: -2, width: side + 4, height: side + 4 }, g);
+  return { g, run, steps, cum, trees: all.length, final: 100 * total / all.length };
+}
+// beat 1: the fire is about to start, so the left-edge trees (burn step 0) show yellow
+const startForest = f => f.steps.forEach(s => { s.path.style.fill = s.k === 0 ? C.hunt : C.tree; });
+const endForest = f => f.steps.forEach(s => { s.path.style.fill = C.ash; });
+const pctAt = (f, k) => 100 * f.cum[Math.min(k, f.cum.length - 1)] / f.trees;
+function lifeKeyframes() {
+  const t = s => s / LIFE;
+  return [
+    { fill: C.tree, offset: 0 }, { fill: C.hunt, offset: 0.01 }, { fill: C.hunt, offset: t(FRONT) },
+    { fill: C.flame, offset: t(FRONT + 1.5) }, { fill: C.flame, offset: t(FRONT + BURN) }, { fill: C.ash, offset: 1 },
+  ];
+}
+function burn(f, animate, later, lead, setPct) {   // returns the time the last cell has gone dark
+  const kf = lifeKeyframes();
+  for (const s of f.steps) animate(s.path, kf, { duration: LIFE * DT, delay: lead + s.k * DT, easing: EASE.linear });
+  let last = -1;
+  for (let k = 0; k <= f.run.steps; k++) {
+    const p = Math.round(pctAt(f, k));
+    if (p !== last) { last = p; const v = p; later(lead + k * DT + 10, () => setPct(v)); }
+  }
+  return lead + (f.run.steps + LIFE) * DT;
+}
+const setCounter = p => { el.counter.querySelector("b").textContent = Math.round(p) + "%"; };
+
+// ---- setup ------------------------------------------------------------------------------------------------------------------
+function setup(ctx, [fireRuns, sweep]) {
+  C = { tree: tok("--tree"), hunt: tok("--hunt"), flame: tok("--flame"), ash: tok("--ash"), ground: tok("--ground") };
+  const run = Object.assign({ size: fireRuns.size }, fireRuns.runs.reduce((a, r) => (Math.abs(r.density - 0.6) < Math.abs(a.density - 0.6) ? r : a)));
+  const pct = Math.round(run.density * 100);
+  const ret = run.burned_fraction.toFixed(2);
+  const dens = sweep.densities, per = sweep.seeds_per_density, total = sweep.results.length;
+  const fr = sweep.results.filter(r => Math.abs(r[0] - run.density) < 1e-9).sort((a, b) => a[1] - b[1]).map(r => r[2]);
+  for (const id of ["card", "cdCall", "cdRet", "counter", "q", "fnote", "rules", "phead", "eq", "indep", "sci", "own", "cap2", "cap3"]) el[id] = $(id);
+  el.rules.querySelectorAll(".rule").forEach((r, i) => { el["rule" + i] = r; });
+
+  // the words, with every number from the data
+  $("r1").innerHTML = `Trees are scattered at random: <em>${pct}%</em> of the cells.`;
+  el.fnote.textContent = `a forest ${run.size} cells across`;
+  el.cdCall.innerHTML = `<span class="fn">burn</span>(${run.density.toFixed(2)}, seed=${fireRuns.seed}, size=${run.size})`;   // code/fire.py: burn(density, seed, size=450)
+  el.cdRet.innerHTML = `<span class="ar">→</span> <b>${ret}</b>`;
+  el.phead.innerHTML = `${pct}% trees <span>· ${fr.length} random ${sweep.size} × ${sweep.size} forests</span>`;
+  el.cap2.innerHTML = "<b>One run is one function call.</b><span>It returns one number: the fraction of trees burned.</span>";
+  el.cap3.innerHTML = `<b>Same density, ${fr.length} random forests, ${fr.length} different answers.</b><span>To trust the answer, you run it many times, at every density.</span>`;
+  el.eq.innerHTML = `<em>${dens.length}</em> densities × <em>${per}</em> forests = <em>${fmt(total)}</em> runs`;
+
+  big = buildForest(art, run, 7, 52, 98);
+  big.g.style.opacity = 0;
+
+  // beat 3: the burned fractions of the forests at this density, one dot each, spread so none sits on another
+  const X0 = 120, X1 = 1160, AY = 480, CY = 300, R = 9;
+  plotG = svg("g", {}, art); plotG.style.opacity = 0;
+  svg("line", { class: "axis", x1: X0, x2: X1, y1: AY, y2: AY }, plotG);
+  for (const v of [0, 0.5, 1]) {
+    svg("line", { class: "axis", x1: X0 + v * (X1 - X0), x2: X0 + v * (X1 - X0), y1: AY - 8, y2: AY + 8 }, plotG);
+    svg("text", { class: "tick-l", x: X0 + v * (X1 - X0), y: AY + 44, "text-anchor": "middle", text: Math.round(v * 100) + "%" }, plotG);
+  }
+  svg("text", { class: "axis-t", x: (X0 + X1) / 2, y: AY + 92, "text-anchor": "middle", text: "fraction of trees burned" }, plotG);
+  const placed = [];
+  fr.map((v, j) => ({ v, j })).sort((a, b) => a.v - b.v).forEach(({ v, j }) => {
+    const x = X0 + v * (X1 - X0);
+    let y = CY;
+    for (let k = 0; ; k++) {                      // 0, +1, -1, +2, -2 ... steps of 19 px until the spot is free
+      const cand = CY + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 19;
+      if (placed.every(p => Math.hypot(p.x - x, p.y - cand) >= 2 * R + 2)) { y = cand; break; }
+    }
+    placed.push({ x, y });
+    const dot = svg("circle", { class: "dot", cx: x, cy: y, r: R }, plotG);
+    dot.style.fill = mix(C.tree, C.ash, v);
+    dot.style.transformBox = "fill-box"; dot.style.transformOrigin = "center";
+    dots.push({ dot, j });
+  });
+  num.spread = Math.max(...placed.map(p => Math.abs(p.y - CY)));
+
+  const pc = Math.round(run.burned_fraction * 100);
+  num.big = run;
+  DEF.alt = [
+    "The question: how dense can a forest be before a fire can cross it? You can't test that by burning real forests, so we simulate it.",
+    `A forest ${run.size} cells across with ${pct} percent trees sits beside three rules: trees are scattered at random, ${pct} percent of the cells; fire starts in every tree on the left edge; each step it spreads to the four neighboring trees.`,
+    `The fire spreads through the forest while the burned counter climbs to ${pc} percent, and a code card reads burn(${run.density.toFixed(2)}, seed=${fireRuns.seed}, size=${run.size}) returning ${ret}: one run is one function call, and it returns one number, the fraction of trees burned.`,
+    `${fr.length} dots on a zero to 100 percent axis of trees burned show ${fr.length} random forests at ${pct} percent trees, with ${fr.length} different answers, so to trust the answer you run it many times, at every density.`,
+    `${dens.length} densities times ${per} forests is ${fmt(total)} runs, and none needs another's result. Fire scientists run far richer models, thousands of times; ours keeps one idea, fire jumps from tree to tree. Your own simulations have the same shape: one model, many settings.`,
+  ];
+}
+
+// ---- states -------------------------------------------------------------------------------------------------------------------
+const DEF = {
+  beats: 4,
+  alt: [],
+  load: () => Promise.all([Anim.loadJSON("data/fire-runs.json"), Anim.loadJSON("data/sweep.json")]),
+  setup,
+
+  render(n) {
+    op(el.q, n === 0 ? 1 : 0);
+    big.g.style.opacity = n === 1 || n === 2 ? 1 : 0;
+    (n >= 2 ? endForest : startForest)(big);
+    op(el.fnote, n === 1 || n === 2 ? 1 : 0);
+    op(el.rules, n === 1 ? 1 : 0);
+    [0, 1, 2].forEach(i => op(el["rule" + i], 1));
+    op(el.card, n === 2 ? 1 : 0);
+    op(el.cdCall, 1);
+    op(el.cdRet, n === 2 ? 1 : 0);
+    op(el.counter, n === 2 ? 1 : 0);
+    setCounter(n === 2 ? big.final : 0);
+    op(el.cap2, n === 2 ? 1 : 0);
+    op(plotG, n === 3 ? 1 : 0);
+    dots.forEach(d => op(d.dot, n === 3 ? 1 : 0));
+    op(el.phead, n === 3 ? 1 : 0);
+    op(el.cap3, n === 3 ? 1 : 0);
+    for (const id of ["eq", "indep", "sci", "own"]) op(el[id], n === 4 ? 1 : 0);
+  },
+
+  enter(n, { animate, later }) {
+    const fade = (a, b) => [{ opacity: a }, { opacity: b }];
+    const rise = y => [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: "translateY(0)" }];
+    const out = (els, ms = 400) => els.forEach(e => animate(e, fade(1, 0), { duration: ms }));
+
+    if (n === 1) {
+      startForest(big);
+      out([el.q]);
+      animate(big.g, fade(0, 1), { duration: 700, delay: 350 });
+      animate(el.fnote, rise(8), { duration: 500, delay: 700 });
+      op(el.rules, 1); [0, 1, 2].forEach(i => op(el["rule" + i], 0));
+      [0, 1, 2].forEach(i => animate(el["rule" + i], rise(12), { duration: 600, delay: 900 + i * 900 }));
+    }
+    if (n === 2) {
+      out([el.rules], 450);
+      animate(el.card, rise(12), { duration: 500, delay: 300 });
+      animate(el.counter, rise(12), { duration: 500, delay: 450 });
+      animate(el.cap2, rise(10), { duration: 550, delay: 600 });
+      setCounter(0);
+      const end = burn(big, animate, later, 600, setCounter);
+      animate(el.cdRet, rise(10), { duration: 500, delay: end - 600 });   // the call returns when the fire is out
+    }
+    if (n === 3) {
+      out([big.g, el.fnote, el.card, el.counter, el.cap2], 500);
+      animate(plotG, fade(0, 1), { duration: 600, delay: 500 });
+      animate(el.phead, rise(10), { duration: 500, delay: 600 });
+      animate(el.cap3, rise(10), { duration: 550, delay: 3000 });
+      dots.forEach(({ dot, j }) => animate(dot, [{ opacity: 0, transform: "scale(0.2)" }, { opacity: 1, transform: "scale(1)" }], { duration: 400, delay: 900 + j * 45, easing: EASE.out }));
+    }
+    if (n === 4) {
+      out([plotG, el.phead, el.cap3, ...dots.map(d => d.dot)], 500);
+      ["eq", "indep", "sci", "own"].forEach((id, i) => animate(el[id], rise(12), { duration: 600, delay: 600 + i * 1000 }));
+    }
+  },
+};
+defineAnimation(DEF);
+</script>
+</body>
+</html>
