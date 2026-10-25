@@ -14,6 +14,7 @@ import random
 from collections import deque
 
 DEFAULT_SIZE = 450  # cells per side; one run at density 0.6 takes about 40 ms
+TINY_SIZE = 4  # cells per side for the counter-example: a run takes microseconds
 
 
 def make_forest(size, density, seed):
@@ -79,6 +80,12 @@ def run(task):
     """Burn one forest for a (density, seed) pair: the one-argument form Pool.map needs."""
     density, seed = task
     return burn(density, seed)
+
+
+def run_tiny(task):
+    """Burn one 4x4 forest for a (density, seed) pair. Microseconds of work: the counter-example."""
+    density, seed = task
+    return burn(density, seed, size=TINY_SIZE)
 
 
 def count_band(band):

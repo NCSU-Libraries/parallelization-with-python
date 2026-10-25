@@ -50,12 +50,14 @@ Paths marked *(planned)* don't exist yet.
 | `site/slides/_bonus-split.qmd`, `_landscape.qmd` | Static slides that the deck includes: the "if there's time" split-the-data bonus after Demo 3, and the wider landscape after the tool ladder. `tools/wire_deck.py` leaves include lines alone |
 | `site/slides/anim/data/` | JSON recorded from real runs by `tools/record_runs.py`. Don't hand-edit it; re-record instead |
 | `code/fire.py` | The forest-fire model that the demos and the notebook use |
+| `code/lanes.py` | The notebook's pictures: `traced_map` records when each task ran; `draw_lanes`, `plot_speedup` and `plot_sweep` draw the deck's pictures in matplotlib. Its reference block (Alp's speedup curve) is written from `scaling.json` |
 | `tools/record_runs.py` | Runs the sweep on this machine: scaling timings, per-task traces, and burn steps for the animations |
 | `tools/check_links.py` | Checks every link and image in `site/_site` (`--web` also requests external URLs) |
 | `tools/shoot.mjs` | Headless Chrome screenshots of pages and slides |
 | `tools/wire_deck.py` | Rewrites each animation slide in the deck from its page: the title, one fragment per beat, the text alternative and `data-state`. `--check` steps every slide of the rendered deck |
 | `tools/check_overlaps.py` | Steps every slide and fragment at three window sizes. Reports content under the footer, logo, slide number or menu button; text over text; and anything off the slide |
-| `notebooks/` *(planned)* | Learner and filled Colab notebooks |
+| `tools/build_notebooks.py` | Writes both notebooks from one cell list, rewrites `code/lanes.py`'s reference block, and copies `fire.py` and `lanes.py` into `notebooks/`. `--check` fails if anything would change |
+| `notebooks/` | Learner and filled notebooks for JupyterLab or Colab, with copies of `fire.py` and `lanes.py`. All generated: don't hand-edit |
 | `instructor/` | Private and gitignored: the run of show, storyboard and polls |
 
 ## Commands
@@ -73,6 +75,10 @@ uv run --with playwright python -I tools/check_overlaps.py     # after a render:
 # Re-record timings, traces and burn steps. Python 3.13 matches Colab. Run it on a quiet machine: close Zoom and
 # don't render while it runs.
 uv run --python 3.13 --no-project tools/record_runs.py
+
+# The notebooks. Edit the cells in tools/build_notebooks.py, and the helpers in code/; then rebuild.
+python3 tools/build_notebooks.py           # also after re-recording (Alp's curve comes from scaling.json)
+python3 tools/build_notebooks.py --check   # nothing hand-edited, nothing stale
 ```
 
 The Pages workflow (`.github/workflows/deploy-pages.yml`) runs `quarto render site` with Quarto 1.10.18. Only Alp
@@ -146,19 +152,23 @@ Embedding, in the deck:
 ## Keeping things consistent
 
 - **The animation data is recorded, not typed.** Numbers on slides and in animations come from
-  `site/slides/anim/data/*.json`. Re-record them with `tools/record_runs.py` and update any text that quotes them.
+  `site/slides/anim/data/*.json`. Re-record them with `tools/record_runs.py`, rebuild the notebooks (their speedup plot shows Alp's curve), and
+  update any text that quotes them.
 - **The data files have fixed shapes:** `scaling.json`, `sweep.json`, `fire-runs.json` and `trace-*.json`.
   `tools/record_runs.py` documents each shape in its docstring. Change a shape there, then update every animation that
   reads it.
-- **Section names appear in three places:** the deck, `instructor/plan.md` and, later, the notebook. Rename one, rename
-  all.
+- **Section names appear in three places:** the deck, `instructor/plan.md` and the notebook's `##` headings (in
+  `tools/build_notebooks.py`). Rename one, rename all.
 - **The go link is on the slides, the QR code and the pages.** If it changes, update `go` in `site/_variables.yml`,
   the deck's `footer:` (YAML can't use `var`), and regenerate the QR code.
 - The theme files and the DSS images were copied from `dsti-python`. Keep them in step if that design changes.
 
 ## Gotchas
 
-- **The Colab links only work once the repo is public on GitHub** and the notebooks are pushed.
+- **The Colab links only work once the repo is public on GitHub** and the notebooks are pushed. The notebook's first cell
+  downloads `fire.py` and `lanes.py` from raw GitHub (`main/notebooks/`), so that needs the push too.
+- **A worker function in the notebook must live in a `.py` file,** never in a cell: workers start with spawn on Mac
+  and Windows, and with forkserver on Linux from Python 3.14. Attendees' own functions go through `%%writefile`.
 - **GitHub Pages:** set Settings → Pages → Source to GitHub Actions *before* the first push. The first push of a
   root commit doesn't trigger the paths-filtered workflow, so run it once from the Actions tab.
 - **Quarto smartens `{{< var >}}` values**, even inside code blocks: a bare `--` becomes an en dash. Escape hyphens in

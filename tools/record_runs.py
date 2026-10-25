@@ -82,7 +82,7 @@ DENSITIES = [round(0.40 + 0.02 * i, 2) for i in range(21)]
 SEEDS = 48
 WORKER_COUNTS = [1, 2, 4, 6, 8, 10, 12, 14, 16]
 REPS = 3
-TINY_SIZE = 4
+TINY_SIZE = fire.TINY_SIZE
 TINY_RUNS = 100_000
 TINY_TRACE_RUNS = 3_000
 
