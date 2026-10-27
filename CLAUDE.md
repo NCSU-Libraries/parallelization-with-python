@@ -48,7 +48,7 @@ Paths marked *(planned)* don't exist yet.
 | `site/_variables.yml` | Facts used on several pages and in the deck: event, links, the go link, the notebook links |
 | `site/setup.qmd` | Step-by-step setup: A. Colab (nothing to install), B. JupyterLab with uv (Mac and Windows tabs), conda, and fixes. Modeled on dsti-python's Setup page |
 | `site/slides/anim/` | One standalone HTML page per animation, plus `_shared/` (stage fit, beats, deck bridge, palette) |
-| `site/slides/_tools.qmd`, `_bonus-split.qmd`, `_landscape.qmd` | Static slides that the deck includes: the tools pair after Waiting vs. computing (threading and asyncio, then multiprocessing's options), the "if there's time" split-the-data bonus after Demo 3, and the wider landscape after the tool ladder. `tools/wire_deck.py` leaves include lines alone |
+| `site/slides/_tools.qmd`, `_bonus-split.qmd`, `_landscape.qmd` | Static slides that the deck includes: the tools pair after Waiting vs. computing (threading and asyncio, then multiprocessing's options); then, after the "Your turn" handoff to the notebook, the "if there's time" split-the-data bonus and the wider landscape. `tools/wire_deck.py` leaves include lines alone |
 | `site/slides/anim/data/` | JSON recorded from real runs by `tools/record_runs.py`. Don't hand-edit it; re-record instead |
 | `code/fire.py` | The forest-fire model that the demos and the notebook use |
 | `code/lanes.py` | The notebook's pictures: `traced_map` records when each task ran; `draw_lanes`, `plot_speedup` and `plot_sweep` draw the deck's pictures in matplotlib. Its reference block (Alp's speedup curve) is written from `scaling.json` |

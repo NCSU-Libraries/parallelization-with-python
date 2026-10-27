@@ -27,6 +27,11 @@ format:
 [Open the materials]{.eyebrow}
 
 [{{< var go >}}]{.statement style="white-space:nowrap;font-size:1.2em"}
+
+::: {.small}
+Slides first, then the notebook. Want your own laptop's cores? Do **Setup**, part B, while we talk.
+Colab needs nothing.
+:::
 :::
 
 ::: {style="text-align:center;padding-top:30px"}
@@ -56,32 +61,6 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 <li>Time it across core counts to see where the gains level off</li>
 <li>See a case where parallel is slower, and why</li>
 </ul>
-
-## Open the notebook {#open-notebook}
-
-::: {.cards .two}
-
-::: {.card}
-[Colab: nothing to install]{.card-title}
-
-1. {{< var go >}} → **Notebooks** → **Learner notebook in Colab**
-2. Click **Copy to Drive**
-3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
-:::
-
-::: {.card}
-[JupyterLab: all your cores]{.card-title}
-
-1. {{< var go >}} → **Setup**, part B: about 15 minutes
-2. `uv run jupyter lab`, and open the notebook
-3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
-:::
-
-:::
-
-::: {.muted}
-The first Setup cell downloads `fire.py` and `lanes.py` next to the notebook. The filled notebook has every answer.
-:::
 
 # Welcome and the main idea {.divider background-color="#CC0000"}
 
@@ -356,8 +335,6 @@ The first Setup cell downloads `fire.py` and `lanes.py` next to the notebook. Th
 
 [Text alternative: A tiny 4 by 4 forest stands next to a big 450 by 450 one: the big run takes about 40 milliseconds, the tiny one about 10 microseconds, with the same code. 3,000 tiny runs replay on 14 lanes with one task per parcel as thin red slivers between long gray gaps of waiting for the next parcel, and a scoreboard shows the plain loop at 0.98 seconds against the pool at 1.62 seconds, 1.65 times slower, like hiring movers to carry one spoon at a time. With chunks of 54 tasks per parcel the lanes fill with solid red blocks and finish at 11.6 ms instead of 49.5 ms; the scoreboard adds the pool with 1,786 tasks per parcel at 0.15 seconds, 6.5 times faster: chunksize bundles tasks into bigger parcels. A rule-of-thumb card: give each parcel real work, milliseconds not microseconds; Pool.map bundles by default; imap and concurrent.futures send one task per parcel unless you set chunksize.]{.visually-hidden}
 
-{{< include _bonus-split.qmd >}}
-
 # Your own work {.divider background-color="#CC0000"}
 
 ## Where to go next {#tool-ladder data-state="anim-slide" background-iframe="anim/tool-ladder.html" background-interactive="true"}
@@ -375,6 +352,36 @@ The first Setup cell downloads `fire.py` and `lanes.py` next to the notebook. Th
 :::
 
 [Text alternative: Step 1 of a four-step ladder: concurrent.futures, the same idea with a newer interface, shown with ProcessPoolExecutor and ex.map. Step 2: joblib, what scikit-learn's n_jobs uses, shown with Parallel and delayed. Step 3: Dask and Ray, for bigger data and many machines. Step 4: a cluster, with job arrays on NC State's Hazel, and mpi4py when the pieces must talk. A footer card: for help with your own project, go to go.ncsu.edu/getdatahelp.]{.visually-hidden}
+
+# Your turn {.divider background-color="#CC0000"}
+
+## Open the notebook {#open-notebook}
+
+::: {.cards .two}
+
+::: {.card}
+[Colab: nothing to install]{.card-title}
+
+1. {{< var go >}} → **Notebooks** → **Learner notebook in Colab**
+2. Click **Copy to Drive**
+3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
+:::
+
+::: {.card}
+[JupyterLab: all your cores]{.card-title}
+
+1. {{< var go >}} → **Setup**, part B, best done during the slides
+2. `uv run jupyter lab`, and open the notebook
+3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
+:::
+
+:::
+
+::: {.muted}
+The first Setup cell downloads `fire.py` and `lanes.py` next to the notebook. The filled notebook has every answer.
+:::
+
+{{< include _bonus-split.qmd >}}
 
 {{< include _landscape.qmd >}}
 
