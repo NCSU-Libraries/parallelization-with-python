@@ -14,7 +14,7 @@ A 90-minute online workshop from NC State University Libraries' Data Science Ser
 Topics. It shows how to use all of your computer's cores with Python's `multiprocessing`, taught through animations,
 with hands-on work in Google Colab (nothing to install).
 
-**Workshop site:** <https://ncsu-libraries.github.io/parallelization-with-python/>
+**Workshop site:** <https://ncsu-libraries.github.io/parallelization-with-python/>, or go.ncsu.edu/parallel-python
 
 ## What's here
 

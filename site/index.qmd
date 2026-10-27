@@ -21,4 +21,10 @@ Use more of your computer's cores to get the same work done sooner.
 - Time it across core counts to see where the gains level off.
 - See a case where parallel is slower, and why.
 
-There's nothing to install: you'll use Google Colab. Follow along in the [slides](slides/index.qmd).
+## Get the notebook
+
+- **Google Colab, nothing to install:** open the [learner notebook in Colab]({{< var colab.learner >}}), click
+  **Copy to Drive**, and run the two **Setup** cells.
+- **JupyterLab on your laptop, all your cores:** follow the [Setup](setup.qmd) steps, about 15 minutes.
+
+The [filled notebook]({{< var colab.filled >}}) has every answer. Follow along in the [slides](slides/index.qmd).

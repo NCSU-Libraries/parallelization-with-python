@@ -45,13 +45,15 @@ Paths marked *(planned)* don't exist yet.
 | Path | Contents |
 | --- | --- |
 | `site/` | Quarto website and the reveal.js deck (`site/slides/index.qmd`) |
-| `site/_variables.yml` | Facts used on several pages and in the deck: event, links, the go link |
+| `site/_variables.yml` | Facts used on several pages and in the deck: event, links, the go link, the notebook links |
+| `site/setup.qmd` | Step-by-step setup: A. Colab (nothing to install), B. JupyterLab with uv (Mac and Windows tabs), conda, and fixes. Modeled on dsti-python's Setup page |
 | `site/slides/anim/` | One standalone HTML page per animation, plus `_shared/` (stage fit, beats, deck bridge, palette) |
 | `site/slides/_tools.qmd`, `_bonus-split.qmd`, `_landscape.qmd` | Static slides that the deck includes: the tools pair after Waiting vs. computing (threading and asyncio, then multiprocessing's options), the "if there's time" split-the-data bonus after Demo 3, and the wider landscape after the tool ladder. `tools/wire_deck.py` leaves include lines alone |
 | `site/slides/anim/data/` | JSON recorded from real runs by `tools/record_runs.py`. Don't hand-edit it; re-record instead |
 | `code/fire.py` | The forest-fire model that the demos and the notebook use |
 | `code/lanes.py` | The notebook's pictures: `traced_map` records when each task ran; `draw_lanes`, `plot_speedup` and `plot_sweep` draw the deck's pictures in matplotlib. Its reference block (Alp's speedup curve) is written from `scaling.json` |
 | `tools/record_runs.py` | Runs the sweep on this machine: scaling timings, per-task traces, and burn steps for the animations |
+| `tools/copy_notebooks.py` | Quarto's post-render step: copies `notebooks/*.ipynb` and `*.py` into `_site/notebooks/` for the Download links |
 | `tools/check_links.py` | Checks every link and image in `site/_site` (`--web` also requests external URLs) |
 | `tools/shoot.mjs` | Headless Chrome screenshots of pages and slides |
 | `tools/wire_deck.py` | Rewrites each animation slide in the deck from its page: the title, one fragment per beat, the text alternative and `data-state`. `--check` steps every slide of the rendered deck |
@@ -159,8 +161,10 @@ Embedding, in the deck:
   reads it.
 - **Section names appear in three places:** the deck, `instructor/plan.md` and the notebook's `##` headings (in
   `tools/build_notebooks.py`). Rename one, rename all.
-- **The go link is on the slides, the QR code and the pages.** If it changes, update `go` in `site/_variables.yml`,
-  the deck's `footer:` (YAML can't use `var`), and regenerate the QR code.
+- **The go link, go.ncsu.edu/parallel-python, is on the slides, the QR code and the pages.** If it changes, update `go`
+  in `site/_variables.yml` and the deck's `footer:` (YAML can't use `var`), and replace `site/images/qr-session.svg`
+  with the QR code from go.ncsu.edu. That QR code holds `go.ncsu.edu/parallel-python%3Aqr`, go.ncsu.edu's way of
+  counting scans, and it redirects to the site.
 - The theme files and the DSS images were copied from `dsti-python`. Keep them in step if that design changes.
 
 ## Gotchas
@@ -174,7 +178,7 @@ Embedding, in the deck:
 - **Quarto smartens `{{< var >}}` values**, even inside code blocks: a bare `--` becomes an en dash. Escape hyphens in
   `_variables.yml`. The deck sets `from: markdown-smart` so quotes in code stay straight.
 - **Keep the deck's footer short, about 50 characters.** A longer one runs under the logo in a laptop-sized window.
-  The go link goes in it once it exists.
+  It's "Data Science Services · go.ncsu.edu/parallel-python", as in dsti-python.
 - **Animation slides carry `data-state="anim-slide"`.** It hides the footer and logo, which would sit on the
   animations' bottom captions. The rule is in `site/theme/slides.scss`, next to the DSS slides' rule, and is this
   repo's one change to the theme copied from dsti-python.

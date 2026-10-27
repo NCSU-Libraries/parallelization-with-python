@@ -4,6 +4,8 @@ project:
   resources:
     - images/
     - slides/anim/
+  # Copies notebooks/*.ipynb and the helper .py files into _site/notebooks/ for the Download links. Runs from site/.
+  post-render: ../tools/copy_notebooks.py
 
 website:
   title: "Parallelization with Python"
@@ -23,7 +25,16 @@ website:
     left:
       - href: index.qmd
         text: Home
-      # Notebook and setup pages come later.
+      - href: setup.qmd
+        text: Setup
+      - text: Notebooks
+        menu:
+          - href: "https://colab.research.google.com/github/NCSU-Libraries/parallelization-with-python/blob/main/notebooks/parallelization-with-python.ipynb"
+            text: "Learner notebook in Colab"
+          - href: "https://colab.research.google.com/github/NCSU-Libraries/parallelization-with-python/blob/main/notebooks/parallelization-with-python-solutions.ipynb"
+            text: "Filled notebook in Colab"
+          - href: setup.qmd#notebook
+            text: "Download the notebooks (JupyterLab)"
     right:
       - href: slides/index.qmd
         text: Slides

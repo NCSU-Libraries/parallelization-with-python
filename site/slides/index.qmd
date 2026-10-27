@@ -13,7 +13,7 @@ format:
     transition: fade
     background-transition: fade
     preview-links: false
-    footer: "Data Science Services · Parallelization with Python"
+    footer: "Data Science Services · go.ncsu.edu/parallel-python"
     logo: ../images/lib_logo_whiteBG.png
     include-after-body:
       text: |
@@ -26,11 +26,11 @@ format:
 ::: {}
 [Open the materials]{.eyebrow}
 
-[{{< var go >}}]{.statement}
+[{{< var go >}}]{.statement style="white-space:nowrap;font-size:1.2em"}
 :::
 
 ::: {style="text-align:center;padding-top:30px"}
-![](../images/qr-session.svg){.qr .qr-big fig-alt="QR code for the workshop materials page, ncsu-libraries.github.io/parallelization-with-python"}
+![](../images/qr-session.svg){.qr .qr-big fig-alt="QR code for the workshop materials page, go.ncsu.edu/parallel-python"}
 :::
 :::
 
@@ -56,6 +56,32 @@ Our team comes from a variety of academic backgrounds, including nuclear enginee
 <li>Time it across core counts to see where the gains level off</li>
 <li>See a case where parallel is slower, and why</li>
 </ul>
+
+## Open the notebook {#open-notebook}
+
+::: {.cards .two}
+
+::: {.card}
+[Colab: nothing to install]{.card-title}
+
+1. {{< var go >}} → **Notebooks** → **Learner notebook in Colab**
+2. Click **Copy to Drive**
+3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
+:::
+
+::: {.card}
+[JupyterLab: all your cores]{.card-title}
+
+1. {{< var go >}} → **Setup**, part B: about 15 minutes
+2. `uv run jupyter lab`, and open the notebook
+3. Run the two **Setup** cells: {{< kbd Shift-Enter >}}
+:::
+
+:::
+
+::: {.muted}
+The first Setup cell downloads `fire.py` and `lanes.py` next to the notebook. The filled notebook has every answer.
+:::
 
 # Welcome and the main idea {.divider background-color="#CC0000"}
 

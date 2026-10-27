@@ -10,10 +10,22 @@ event:
 
 site: "https://ncsu-libraries.github.io/parallelization-with-python/"
 site-short: "ncsu-libraries.github.io/parallelization-with-python"
-# TODO: Alp will make a go link later (for example go.ncsu.edu/dss-parallel). Until then, use the site address.
-go: "ncsu-libraries.github.io/parallelization-with-python"
+go: "go.ncsu.edu/parallel-python"   # short link to the site, on the slides and the QR code (images/qr-session.svg)
 repo: "https://github.com/NCSU-Libraries/parallelization-with-python"
 help: "https://go.ncsu.edu/getdatahelp"
 email: "lib-datascienceservices@ncsu.edu"
 eval: "https://go.ncsu.edu/dss-workshop-eval"
 workshops: "https://go.ncsu.edu/datavizworkshops"   # every DSS workshop, with dates
+
+# The notebooks: in Colab, and as downloads from this site (tools/copy_notebooks.py puts them in _site/notebooks/)
+colab:
+  learner: "https://colab.research.google.com/github/NCSU-Libraries/parallelization-with-python/blob/main/notebooks/parallelization-with-python.ipynb"
+  filled: "https://colab.research.google.com/github/NCSU-Libraries/parallelization-with-python/blob/main/notebooks/parallelization-with-python-solutions.ipynb"
+download:
+  learner: "notebooks/parallelization-with-python.ipynb"
+  filled: "notebooks/parallelization-with-python-solutions.ipynb"
+raw:
+  learner: "https://raw.githubusercontent.com/NCSU-Libraries/parallelization-with-python/main/notebooks/parallelization-with-python.ipynb"
+
+# The Python that Colab runs; the Setup page's uv and conda commands use it too
+python: "3.13"

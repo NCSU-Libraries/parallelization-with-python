@@ -1,0 +1,207 @@
+---
+title: "Set up"
+subtitle: "Colab takes two minutes and needs no install. JupyterLab on your laptop takes about 15 minutes, and uses all your cores."
+---
+
+::: {.callout-note}
+## Which one?
+
+**Colab** runs in your browser, so there's nothing to install. Its free tier gives you 2 cores. **JupyterLab on your
+laptop** uses your own cores, often 8 or more. Both run the same notebook. Not sure? Start with Colab
+([part A](#colab)). You can switch later.
+:::
+
+## A. Google Colab: nothing to install {#colab}
+
+1. Open the [learner notebook in Colab]({{< var colab.learner >}}). The
+   [filled notebook]({{< var colab.filled >}}) has every answer.
+2. Sign in with your Google account.
+3. Click **Copy to Drive** in the toolbar. Work in the new tab, titled
+   **Copy of parallelization-with-python.ipynb**.
+4. Click the first code cell under **Setup**, and press {{< kbd Shift-Enter >}}. Run the next cell the same way.
+
+**It works when** the first cell prints `downloaded fire.py` and `downloaded lanes.py`, and the second prints your
+Python version and `start method: fork`.
+
+A "not authored by Google" warning means you're in the original tab. Switch to your copy.
+
+## B. JupyterLab on your laptop {#jupyterlab}
+
+::: {.callout-tip}
+## Did our Introduction to Programming with Python setup?
+
+You already have uv and a `dss-python` folder with JupyterLab. Open a terminal, run `cd dss-python`, and skip to
+[step 6](#notebook).
+:::
+
+### 1. Open a terminal
+
+A terminal is a window where you type commands instead of clicking.
+
+::: {.panel-tabset}
+#### Mac
+
+Press {{< kbd Cmd-Space >}}, type **Terminal**, and press {{< kbd Enter >}}.
+
+#### Windows
+
+Press the {{< kbd Win >}} key, type **PowerShell**, and press {{< kbd Enter >}}. Your prompt starts with `PS C:\`.
+:::
+
+### 2. Install uv
+
+uv is one small tool that installs Python and the packages you need. It needs no admin rights. Copy the line for your
+computer, paste it into the terminal, and press {{< kbd Enter >}}.
+
+::: {.panel-tabset}
+#### Mac
+
+::: {.prompt .prompt-shell}
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+:::
+
+#### Windows (PowerShell)
+
+::: {.prompt .prompt-shell}
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+:::
+:::
+
+### 3. Check it worked
+
+**Close the terminal and open a new one**, so it can find uv. Then run:
+
+::: {.prompt .prompt-shell}
+```bash
+uv --version
+```
+:::
+
+You should see a version number.
+
+### 4. Make your project folder
+
+::: {.prompt .prompt-shell}
+```bash
+uv init --python {{< var python >}} --vcs none --no-package dss-parallel
+cd dss-parallel
+```
+:::
+
+The folder is made in your home folder. `--python {{< var python >}}` matches the Python that Colab uses, so the
+notebook behaves the same in both places.
+
+### 5. Add JupyterLab, matplotlib and psutil
+
+::: {.prompt .prompt-shell}
+```bash
+uv add jupyterlab matplotlib psutil
+```
+:::
+
+**This is the slow step.** It's done when your prompt comes back. Download the notebook (step 6) while you wait.
+
+### 6. Download the notebook {#notebook}
+
+- [Download the learner notebook]({{< var download.learner >}}){download="" data-noresolveinput=""}: blank code to
+  write with us. This is the one you need.
+- [Download the filled notebook]({{< var download.filled >}}){download="" data-noresolveinput=""}: every answer, to
+  check your work.
+
+Your browser saves them in your Downloads folder.
+
+::: {.callout-tip collapse="true"}
+## Prefer the terminal?
+
+Run this inside your project folder. The notebook lands right there, so you can skip dragging it in (step 7).
+
+::: {.panel-tabset}
+#### Mac
+
+::: {.prompt .prompt-shell}
+```bash
+curl -LO {{< var raw.learner >}}
+```
+:::
+
+#### Windows (PowerShell)
+
+Type `curl.exe`, with the `.exe`. Plain `curl` in PowerShell is a different tool.
+
+::: {.prompt .prompt-shell}
+```powershell
+curl.exe -LO {{< var raw.learner >}}
+```
+:::
+:::
+:::
+
+### 7. Start JupyterLab and run the Setup cells
+
+Once step 5 is finished, run this in your project folder:
+
+::: {.prompt .prompt-shell}
+```bash
+uv run jupyter lab
+```
+:::
+
+Your browser opens JupyterLab. **Leave the terminal open.** It's running JupyterLab.
+
+1. Drag the notebook from your Downloads folder onto JupyterLab's file list in the left sidebar. Or click the
+   **Upload** button (↑) above the file list, and choose the file.
+2. Double-click the notebook to open it.
+3. Click the first code cell under **Setup**, and press {{< kbd Shift-Enter >}}. Run the next cell the same way.
+
+**It works when** the first cell prints `downloaded fire.py` and `downloaded lanes.py` (it needs the internet this
+once), and the second prints your Python version and `start method: spawn` on a Mac or Windows.
+
+### 8. Stop, and start again later
+
+Save your work with {{< kbd mac=Cmd-S win=Ctrl-S >}}. To stop JupyterLab, go back to the terminal and press
+{{< kbd Ctrl-C >}} twice. Next time, open a terminal and run:
+
+::: {.prompt .prompt-shell}
+```bash
+cd dss-parallel
+uv run jupyter lab
+```
+:::
+
+### Already use conda?
+
+Use these commands instead of steps 2 to 5, in Terminal on a Mac, or in Anaconda Prompt or Miniforge Prompt on
+Windows. Then continue with step 6, and skip the `uv run jupyter lab` command: the last line starts JupyterLab.
+
+::: {.prompt .prompt-shell}
+```bash
+conda create -y -n dss-parallel -c conda-forge --override-channels python={{< var python >}} jupyterlab matplotlib psutil
+conda activate dss-parallel
+mkdir dss-parallel
+cd dss-parallel
+jupyter lab
+```
+:::
+
+The first command is one long line. Use the copy button.
+
+## If something goes wrong
+
+| What you see | What to do |
+| --- | --- |
+| `uv: command not found` | Open a new terminal. Still missing on a Mac? Run `source $HOME/.local/bin/env`. |
+| "running scripts is disabled" (Windows) | Use the exact command in step 2, with `-ExecutionPolicy ByPass`. |
+| The browser didn't open | Copy the `http://localhost:…` link from the terminal and paste it into your browser. |
+| `ModuleNotFoundError: No module named 'fire'` | Run the first Setup cell. It downloads `fire.py` and `lanes.py` next to the notebook. |
+| `HTTPError` or `URLError` in the first cell | The download was blocked. Save [fire.py](notebooks/fire.py){download="" data-noresolveinput=""} and [lanes.py](notebooks/lanes.py){download="" data-noresolveinput=""} into the notebook's folder. |
+| `Can't get attribute 'work' on <module '__main__'>` | Your worker function is defined in a cell. Put it in a `.py` file, as the template does with `%%writefile`. |
+| A cell runs forever | Stop it (■), then restart: **Kernel → Restart Kernel** in JupyterLab, **Runtime → Restart session** in Colab. Run the cells again from the top. |
+| Chromebook or tablet | Use Colab ([part A](#colab)). |
+
+<p class="small-muted">uv changes often. If a screen looks different, the
+<a href="https://docs.astral.sh/uv/getting-started/installation/">official install page</a> wins. Help with your own
+setup: <a href="{{< var help >}}">go.ncsu.edu/getdatahelp</a>.</p>
