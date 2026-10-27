@@ -495,8 +495,11 @@ md("script-note", """
 
 In a plain script, the pool code must sit under `if __name__ == "__main__":`. With spawn, each worker imports the script again. Without the guard, each worker would try to start a pool of its own, and Python stops with an error.
 
-```python
-# run_sweep.py
+The next cell writes such a script, `run_sweep.py`, using your `work` function. The cell after it runs the script the way a terminal would: `python run_sweep.py`.
+""")
+
+code("write-script", '''
+%%writefile run_sweep.py
 from multiprocessing import Pool
 
 from my_task import work
@@ -511,10 +514,15 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
+''')
 
-Run it with `python run_sweep.py`.
+code("run-script", """
+import sys
 
+!{sys.executable} run_sweep.py
+""")
+
+md("next-head", """
 ### Where to go next
 
 - Other tools from the slides: `concurrent.futures` (the same idea, a newer interface), joblib (what scikit-learn's `n_jobs` uses), Dask and Ray for bigger data and many machines, and job arrays on NC State's Hazel cluster.
