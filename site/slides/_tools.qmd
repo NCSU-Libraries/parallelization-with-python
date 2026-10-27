@@ -1,0 +1,67 @@
+## For waiting: threading and asyncio {#tools-waiting}
+
+::: {.cards .two}
+
+::: {.card}
+[Threads: `threading`]{.card-title}
+Several threads share one process and its memory. Python's lock, the **GIL**, lets one thread run Python code at a
+time, so threads overlap waits, not work. The easy way in: a thread pool from `concurrent.futures`.
+
+```{=html}
+<pre class="type diagram" style="width:auto; font-size:0.8em; margin:12px 0 0; padding:14px 16px">with ThreadPoolExecutor(8) as ex:
+    pages = list(ex.map(fetch, urls))</pre>
+```
+:::
+
+::: {.card}
+[One thread, many waits: `asyncio`]{.card-title}
+An event loop runs functions that pause at `await` while they wait, and runs another one meanwhile. Thousands of
+waits at once, with async libraries such as httpx.
+
+```{=html}
+<pre class="type diagram" style="width:auto; font-size:0.8em; margin:12px 0 0; padding:14px 16px">async def main():
+    jobs = [fetch(u) for u in urls]
+    return await asyncio.gather(*jobs)
+pages = asyncio.run(main())</pre>
+```
+:::
+
+:::
+
+::: {.card .red}
+[Not today: a forest fire computes; it doesn't wait.]{.card-title} Reach for these when your program mostly waits on
+the network or the disk: downloads, web APIs, databases.
+:::
+
+::: {.notes}
+- NumPy, pandas and other compiled libraries release the GIL inside their heavy loops, so threads can speed those up.
+  Pure Python code, like our forest fire, can't.
+- Python 3.14 makes the free-threaded build officially supported, but it is still a separate, optional install.
+- asyncio helps only when every slow call is async-aware (httpx, aiohttp, asyncpg). One blocking call stalls the loop.
+:::
+
+## For computing: multiprocessing {#tools-computing}
+
+::: {.small}
+Separate processes, each with its own memory and its own Python, compute at the same time. The cost: starting them,
+and sending inputs and results between them.
+:::
+
+| In code | Use it for |
+| --- | --- |
+| `pool.map(run, tasks)` [today]{.pill} | One function, many inputs, results in order |
+| `pool.imap_unordered(run, tasks)` | Results as they finish: progress bars, long lists |
+| `pool.starmap(burn, pairs)` | A function with several arguments |
+| `pool.apply_async(burn, (0.6, 1))` | Different jobs, sent one at a time |
+| `Process(target=job).start()` | One long job beside your program |
+| `ProcessPoolExecutor().submit(run, task)` | The same pool, `concurrent.futures` style |
+
+::: {.muted}
+When processes must talk: `Queue`, `Pipe`, `shared_memory` and `Manager`.
+:::
+
+::: {.notes}
+- `Pool.map` is today's tool; "How multiprocessing works" opens it up.
+- `imap` and `imap_unordered` send one task at a time unless you set `chunksize` (Demo 3 shows why that matters).
+- `apply_async` and `submit` return a handle; call `.get()` or `.result()` to wait for the answer.
+:::
